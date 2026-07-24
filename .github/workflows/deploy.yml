@@ -1,0 +1,61 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# En az yetki: yalnızca deploy işi Pages'a yazabilir.
+permissions:
+  contents: read
+
+# Eşzamanlı deploy'ları sıraya sok, çalışanı iptal etme.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Doğrula
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Sözdizimi, kendine yeterlilik, veri bütünlüğü, resmî kaynak alan adları.
+      - name: index.html doğrula
+        run: node scripts/validate.mjs
+
+  deploy:
+    name: Yayınla
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Yalnızca uygulama yayınlanır; dokümanlar ve betikler repoda kalır.
+      - name: Site klasörünü hazırla
+        run: |
+          mkdir -p _site
+          cp index.html _site/index.html
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,2099 @@
+<meta charset="utf-8" />
+<title>CCAF Study Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<style>
+/* ============================================================
+   DOSYA — case file. Sıcak kum kâğıt, koyu nar mürekkep.
+   Tek dosya, harici bağımlılık yok, sistem fontları.
+   Ana kural: YANLIŞ OLMAK RENK TAŞIMAZ. Kroma bütçesi
+   yalnızca "resmî kaynak ne diyor" eksenine harcanır.
+============================================================ */
+
+:root {
+  color-scheme: light;
+
+  --surface:        oklch(.968 .008 75);
+  --surface-sunk:   oklch(.942 .010 72);
+  --surface-raise:  oklch(.991 .004 80);
+
+  --ink:            oklch(.24  .016 45);
+  --ink-2:          oklch(.46  .014 50);
+  --ink-3:          oklch(.56  .012 55);
+
+  --rule:           oklch(.885 .010 70);
+  --rule-2:         oklch(.820 .012 68);
+
+  --garnet:         oklch(.44  .14  25);
+  --garnet-deep:    oklch(.36  .13  25);
+  --garnet-wash:    oklch(.935 .028 30);
+  --garnet-on:      oklch(.972 .012 40);
+
+  --pine:           oklch(.44  .09  155);
+  --pine-wash:      oklch(.948 .026 160);
+
+  --ochre:          oklch(.45  .10  72);
+  --ochre-wash:     oklch(.950 .030 80);
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+          system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono",
+          "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --rail: 264px;
+  --toc: 220px;
+  --measure: 68ch;
+  --r-s: 3px;
+  --r-m: 6px;
+
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --t: 180ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface:        oklch(.205 .012 55);
+  --surface-sunk:   oklch(.172 .010 55);
+  --surface-raise:  oklch(.248 .013 55);
+  --ink:            oklch(.93  .008 78);
+  --ink-2:          oklch(.74  .010 70);
+  --ink-3:          oklch(.55  .010 60);
+  --rule:           oklch(.302 .012 55);
+  --rule-2:         oklch(.385 .014 55);
+  --garnet:         oklch(.66  .15  20);
+  --garnet-deep:    oklch(.74  .14  22);
+  --garnet-wash:    oklch(.265 .035 28);
+  --garnet-on:      oklch(.16  .015 30);
+  --pine:           oklch(.68  .11  158);
+  --pine-wash:      oklch(.245 .030 158);
+  --ochre:          oklch(.75  .11  75);
+  --ochre-wash:     oklch(.262 .032 75);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface:        oklch(.205 .012 55);
+    --surface-sunk:   oklch(.172 .010 55);
+    --surface-raise:  oklch(.248 .013 55);
+    --ink:            oklch(.93  .008 78);
+    --ink-2:          oklch(.74  .010 70);
+    --ink-3:          oklch(.55  .010 60);
+    --rule:           oklch(.302 .012 55);
+    --rule-2:         oklch(.385 .014 55);
+    --garnet:         oklch(.66  .15  20);
+    --garnet-deep:    oklch(.74  .14  22);
+    --garnet-wash:    oklch(.265 .035 28);
+    --garnet-on:      oklch(.16  .015 30);
+    --pine:           oklch(.68  .11  158);
+    --pine-wash:      oklch(.245 .030 158);
+    --ochre:          oklch(.75  .11  75);
+    --ochre-wash:     oklch(.262 .032 75);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--garnet-wash); color: var(--ink); }
+
+:focus-visible {
+  outline: 2px solid var(--garnet);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+.skip {
+  position: absolute; left: 12px; top: -60px; z-index: 200;
+  background: var(--garnet); color: var(--garnet-on);
+  padding: 10px 16px; border-radius: var(--r-s); font-weight: 700; font-size: .9rem;
+  transition: top var(--t) var(--ease);
+}
+.skip:focus { top: 12px; }
+
+/* ---------------- Shell ---------------- */
+
+.app { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 100vh; }
+
+.rail {
+  border-right: 1px solid var(--rule);
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  padding: 26px 14px 48px;
+  background: var(--surface);
+}
+
+.mast { padding: 0 10px 26px; }
+.mast .wordmark {
+  font-family: var(--mono); font-size: .8rem; font-weight: 600; letter-spacing: .02em;
+  color: var(--garnet); display: block;
+}
+.mast h1 {
+  font-size: 1.02rem; font-weight: 750; letter-spacing: -.02em;
+  line-height: 1.25; margin: 4px 0 0;
+}
+.mast p { font-size: .78rem; color: var(--ink-2); margin: 3px 0 0; line-height: 1.45; }
+
+.navgroup { margin-bottom: 26px; }
+.navgroup > .glabel {
+  font-size: .715rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-2); padding: 0 10px 9px; display: block;
+}
+
+.nav {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: var(--r-s);
+  font-size: .885rem; color: var(--ink-2);
+  transition: background-color var(--t) var(--ease), color var(--t) var(--ease);
+  position: relative;
+}
+.nav:hover { background: var(--surface-sunk); color: var(--ink); }
+.nav[aria-current="page"] { color: var(--ink); font-weight: 650; background: var(--surface-sunk); }
+.nav[aria-current="page"]::before {
+  content: ""; position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 3px; background: var(--garnet); border-radius: 50%;
+}
+.nav .glyph { color: var(--ink-3); font-size: .82rem; width: 14px; text-align: center; flex: none; }
+.nav[aria-current="page"] .glyph { color: var(--garnet); }
+.nav .n {
+  margin-left: auto; font-family: var(--mono); font-size: .72rem; font-weight: 600;
+  color: var(--ink-2); flex: none;
+}
+.nav .mono-code {
+  font-family: var(--mono); font-size: .68rem; font-weight: 700; letter-spacing: .02em;
+  color: var(--ink-2); border: 1px solid var(--rule-2); border-radius: 2px;
+  width: 30px; text-align: center; flex: none; padding: 1px 0;
+}
+.nav[aria-current="page"] .mono-code { color: var(--garnet); border-color: var(--garnet); }
+
+/* ---------------- Topbar ---------------- */
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; gap: 14px;
+  padding: 11px 32px;
+}
+.crumbs {
+  font-size: .8rem; color: var(--ink-2); display: flex; align-items: center; gap: 8px;
+  min-width: 0; overflow: hidden; white-space: nowrap;
+}
+.crumbs b { color: var(--ink); font-weight: 650; }
+.crumbs a { color: var(--ink-2); }
+.crumbs a:hover { color: var(--garnet); }
+.crumbs .sep { color: var(--ink-3); }
+
+.finder {
+  margin-left: auto; display: flex; align-items: center; gap: 8px;
+  background: var(--surface-raise); border: 1px solid var(--rule-2);
+  border-radius: var(--r-s); padding: 5px 10px; width: 250px; max-width: 38vw;
+  transition: border-color var(--t) var(--ease);
+}
+.finder:focus-within { border-color: var(--garnet); }
+.finder .g { color: var(--ink-3); font-size: .85rem; flex: none; }
+.finder input {
+  border: 0; background: transparent; outline: none; color: var(--ink);
+  font-family: var(--sans); font-size: .85rem; width: 100%; min-width: 0;
+}
+.finder input::placeholder { color: var(--ink-3); }
+.finder kbd {
+  font-family: var(--mono); font-size: .68rem; color: var(--ink-2);
+  border: 1px solid var(--rule-2); border-radius: 2px; padding: 0 5px; flex: none;
+}
+
+.iconbtn {
+  border: 1px solid var(--rule-2); background: var(--surface-raise); color: var(--ink-2);
+  border-radius: var(--r-s); width: 32px; height: 32px; flex: none;
+  display: grid; place-items: center; font-size: .95rem;
+  transition: border-color var(--t) var(--ease), color var(--t) var(--ease);
+}
+.iconbtn:hover { color: var(--garnet); border-color: var(--garnet); }
+.menubtn { display: none; }
+
+.content { padding: 40px 32px 120px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+.reading { max-width: var(--measure); }
+
+/* ---------------- Type ---------------- */
+
+.eyebrow {
+  font-size: .715rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--garnet); margin: 0 0 14px;
+}
+h2.title {
+  font-size: 1.95rem; font-weight: 750; letter-spacing: -.026em; line-height: 1.14;
+  margin: 0 0 14px; max-width: 22ch;
+}
+.briefing {
+  font-size: clamp(2rem, 1.5rem + 1.9vw, 2.85rem);
+  font-weight: 800; letter-spacing: -.035em; line-height: 1.06;
+  margin: 0 0 20px; max-width: 17ch;
+}
+.briefing .quiet { color: var(--ink-2); font-weight: 750; }
+.lede { font-size: 1.02rem; color: var(--ink-2); margin: 0 0 32px; max-width: var(--measure); }
+
+h3 {
+  font-size: 1.32rem; font-weight: 700; letter-spacing: -.014em; line-height: 1.3;
+  margin: 56px 0 14px; scroll-margin-top: 88px;
+}
+h3:first-of-type { margin-top: 44px; }
+h4 { font-size: 1.02rem; font-weight: 700; letter-spacing: -.005em; margin: 32px 0 10px; }
+p { margin: 0 0 16px; }
+strong, b { font-weight: 650; }
+.small { font-size: .865rem; line-height: 1.6; }
+.quiet { color: var(--ink-2); }
+
+.mlabel {
+  font-size: .715rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-2); display: flex; align-items: center; gap: 7px;
+}
+.mlabel code { text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+code {
+  font-family: var(--mono); font-size: .84em;
+  background: var(--surface-sunk); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1px 5px; word-break: break-word;
+}
+pre {
+  background: var(--surface-sunk); border: 1px solid var(--rule); border-radius: var(--r-m);
+  padding: 16px 18px; overflow-x: auto; margin: 0 0 18px;
+  font-size: .8rem; line-height: 1.65;
+}
+pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+ul, ol { margin: 0 0 16px; padding-left: 22px; }
+li { margin-bottom: 7px; }
+li::marker { color: var(--ink-3); }
+
+hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 48px 0; }
+
+/* ---------------- Chips ---------------- */
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .715rem; font-weight: 700; letter-spacing: .04em;
+  border-radius: var(--r-s); padding: 3px 9px;
+  border: 1px solid var(--rule-2); color: var(--ink-2); background: transparent;
+  white-space: nowrap; line-height: 1.5;
+}
+.chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+
+.chip.v-ok    { color: var(--pine);   border-color: var(--pine); }
+.chip.v-warn  { color: var(--ochre);  border-color: var(--ochre); }
+.chip.v-conf  { color: var(--garnet-on); background: var(--garnet); border-color: var(--garnet); }
+
+.tcode {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: .68rem; font-weight: 700; letter-spacing: .02em;
+  border: 1px solid var(--rule-2); border-radius: 2px;
+  padding: 1px 6px; color: var(--ink-2); flex: none;
+}
+a:hover > .tcode, .row:hover .tcode { border-color: var(--garnet); color: var(--garnet); }
+
+.stars { font-size: .75rem; color: var(--ink-3); letter-spacing: .12em; flex: none; }
+.stars .on { color: var(--garnet); }
+
+.meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ---------------- Ledger rows ---------------- */
+
+.ledger { border-top: 1px solid var(--rule); margin: 0 0 8px; }
+
+.row {
+  display: block; position: relative;
+  padding: 18px 18px 18px 20px;
+  border-bottom: 1px solid var(--rule);
+  transition: background-color var(--t) var(--ease);
+}
+a.row:hover, a.row:focus-visible { background: var(--surface-sunk); }
+a.row::before {
+  content: ""; position: absolute; left: 5px; top: 24px;
+  width: 3px; height: 3px; background: var(--garnet);
+  opacity: 0; transition: opacity var(--t) var(--ease);
+}
+a.row:hover::before, a.row:focus-visible::before { opacity: 1; }
+
+.row .rtop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 9px; }
+.row .rid {
+  font-family: var(--mono); font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+  color: var(--ink-2); flex: none;
+}
+.row .rq { font-size: .97rem; font-weight: 550; line-height: 1.55; margin-bottom: 8px; max-width: 78ch; }
+.row .ra { font-size: .845rem; color: var(--ink-2); max-width: 78ch; }
+.row .ra .k { color: var(--pine); font-weight: 700; }
+
+/* ---------------- Data strip ---------------- */
+
+.strip {
+  display: flex; flex-wrap: wrap;
+  border-top: 1px solid var(--rule-2); border-bottom: 1px solid var(--rule-2);
+  margin: 0 0 44px;
+}
+.strip > div {
+  padding: 16px 28px 16px 0; margin-right: 28px;
+  border-right: 1px solid var(--rule);
+}
+.strip > div:last-child { border-right: 0; margin-right: 0; }
+.strip .n {
+  font-size: 1.7rem; font-weight: 750; letter-spacing: -.03em; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.strip .n.acc { color: var(--garnet); }
+.strip .l { font-size: .78rem; color: var(--ink-2); margin-top: 2px; }
+
+/* ---------------- Cards (sparingly) ---------------- */
+
+.card {
+  border: 1px solid var(--rule); border-radius: var(--r-m);
+  padding: 20px 22px; background: transparent;
+}
+.grid { display: grid; gap: 18px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* ---------------- Bars ---------------- */
+
+.bar { height: 5px; background: var(--surface-sunk); border-radius: 20px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--garnet); border-radius: 20px; }
+.bar.q > i { background: var(--rule-2); }
+
+/* ---------------- Answer blocks ---------------- */
+
+/* Yanlış olmak renk taşımaz: nötr, çökertilmiş, glif + etiketle işaretli. */
+.ans-wrong {
+  background: var(--surface-sunk); border: 1px solid var(--rule);
+  border-radius: var(--r-m); padding: 15px 18px; margin: 0 0 14px;
+}
+.ans-wrong .mlabel { color: var(--ink-2); margin-bottom: 8px; }
+.ans-wrong .body { font-size: .95rem; color: var(--ink-2); }
+.ans-wrong .body code { background: var(--surface); }
+
+.ans-right { border-top: 1px solid var(--pine); padding: 15px 2px 4px; margin: 0 0 8px; }
+.ans-right .mlabel { color: var(--pine); margin-bottom: 8px; }
+.ans-right .body { font-size: .95rem; color: var(--ink); font-weight: 500; }
+
+/* ---------------- Callouts (no side stripes) ---------------- */
+
+.note {
+  border: 1px solid var(--rule-2); border-radius: var(--r-m);
+  padding: 18px 20px; margin: 0 0 22px;
+}
+.note .mlabel { margin-bottom: 9px; }
+.note p:last-child { margin-bottom: 0; }
+.note.acc { border-color: var(--garnet); background: var(--garnet-wash); }
+.note.acc .mlabel { color: var(--garnet); }
+.note.warn { border-color: var(--ochre); background: var(--ochre-wash); }
+.note.warn .mlabel { color: var(--ochre); }
+.note.ok { border-color: var(--pine); background: var(--pine-wash); }
+.note.ok .mlabel { color: var(--pine); }
+
+/* ---------------- Flow / remember ---------------- */
+
+.remember { background: var(--surface-sunk); border-radius: var(--r-m); padding: 20px 22px; }
+.remember .mlabel { margin-bottom: 14px; color: var(--ink); }
+.flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.flow.vert { flex-direction: column; align-items: flex-start; gap: 8px; }
+.flow .node {
+  font-family: var(--mono); font-size: .78rem; font-weight: 600;
+  background: var(--surface); border: 1px solid var(--rule-2); border-radius: var(--r-s);
+  padding: 6px 11px;
+}
+.flow .node.no { border-color: var(--rule-2); color: var(--ink-2); text-decoration: line-through; }
+.flow .node.yes { border-color: var(--pine); color: var(--pine); }
+.flow .arrow { color: var(--ink-3); font-size: .9rem; flex: none; }
+.flow.vert .arrow { margin-left: 14px; }
+
+/* ---------------- Doc links ---------------- */
+
+.doc {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border: 1px solid var(--rule); border-radius: var(--r-m);
+  margin-bottom: 8px;
+  transition: border-color var(--t) var(--ease), background-color var(--t) var(--ease);
+}
+.doc:hover, .doc:focus-visible { border-color: var(--garnet); background: var(--surface-sunk); }
+.doc .g { color: var(--ink-3); font-size: .85rem; flex: none; }
+.doc:hover .g { color: var(--garnet); }
+.doc .m { min-width: 0; }
+.doc .t { font-size: .9rem; font-weight: 600; }
+.doc .u { font-family: var(--mono); font-size: .74rem; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc .x { margin-left: auto; color: var(--ink-3); font-size: .85rem; flex: none; }
+
+/* ---------------- Pills ---------------- */
+
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: .82rem; border: 1px solid var(--rule-2); border-radius: var(--r-s);
+  padding: 5px 11px; color: var(--ink-2);
+  transition: border-color var(--t) var(--ease), color var(--t) var(--ease);
+}
+.pill:hover, .pill:focus-visible { border-color: var(--garnet); color: var(--garnet); }
+
+/* ---------------- Buttons ---------------- */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: .875rem; font-weight: 650;
+  border: 1px solid var(--rule-2); border-radius: var(--r-s);
+  padding: 9px 16px; color: var(--ink);
+  transition: border-color var(--t) var(--ease), background-color var(--t) var(--ease), color var(--t) var(--ease);
+}
+.btn:hover { border-color: var(--garnet); color: var(--garnet); }
+.btn.pri { background: var(--garnet); border-color: var(--garnet); color: var(--garnet-on); }
+.btn.pri:hover { background: var(--garnet-deep); border-color: var(--garnet-deep); color: var(--garnet-on); }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.back {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: .85rem; color: var(--ink-2); margin-bottom: 22px;
+  transition: color var(--t) var(--ease);
+}
+.back:hover { color: var(--garnet); }
+
+/* ---------------- Filters ---------------- */
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+.fbtn {
+  font-size: .82rem; border: 1px solid var(--rule-2); border-radius: var(--r-s);
+  padding: 6px 13px; color: var(--ink-2);
+  transition: border-color var(--t) var(--ease), background-color var(--t) var(--ease), color var(--t) var(--ease);
+}
+.fbtn:hover { border-color: var(--garnet); color: var(--garnet); }
+.fbtn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.fbtn .n { font-family: var(--mono); font-size: .74rem; opacity: .75; margin-left: 5px; }
+
+/* ---------------- TOC ---------------- */
+
+.with-toc { display: grid; grid-template-columns: minmax(0, 1fr) var(--toc); gap: 56px; align-items: start; }
+.toc { position: sticky; top: 88px; font-size: .82rem; }
+.toc .mlabel { margin-bottom: 12px; }
+.toc a {
+  display: block; color: var(--ink-2); padding: 5px 0 5px 14px;
+  border-left: 1px solid var(--rule);
+  transition: color var(--t) var(--ease), border-color var(--t) var(--ease);
+}
+.toc a:hover { color: var(--garnet); border-left-color: var(--garnet); }
+
+/* ---------------- Roadmap ---------------- */
+
+.road { position: relative; padding-left: 34px; }
+.road::before {
+  content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px;
+  width: 2px; background: var(--rule);
+}
+.step { position: relative; margin-bottom: 22px; }
+.step .dot {
+  position: absolute; left: -34px; top: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--rule-2);
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: .6rem; font-weight: 700; color: var(--ink-2);
+}
+.step.done .dot { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+.step.now .dot { border-color: var(--garnet); background: var(--garnet); color: var(--garnet-on); }
+.step .sh { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 5px; }
+.step h4 { margin: 0; font-size: 1rem; }
+.step p { font-size: .875rem; color: var(--ink-2); margin: 0 0 10px; max-width: var(--measure); }
+
+/* ---------------- Forms ---------------- */
+
+textarea.paste {
+  width: 100%; min-height: 200px; resize: vertical;
+  font-family: var(--mono); font-size: .8rem; line-height: 1.55; padding: 16px;
+  border: 1px solid var(--rule-2); border-radius: var(--r-m);
+  background: var(--surface-sunk); color: var(--ink); outline: none;
+  transition: border-color var(--t) var(--ease);
+}
+textarea.paste:focus { border-color: var(--garnet); }
+textarea.paste::placeholder { color: var(--ink-3); }
+
+.empty { color: var(--ink-2); padding: 56px 0; font-size: .95rem; }
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 1080px) {
+  .with-toc { grid-template-columns: 1fr; gap: 0; }
+  .toc { display: none; }
+  .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 800px) {
+  .app { grid-template-columns: 1fr; }
+  .rail {
+    position: fixed; z-index: 90; width: 82vw; max-width: 320px;
+    transform: translateX(-101%); transition: transform var(--t) var(--ease);
+    border-right: 1px solid var(--rule-2);
+  }
+  .rail.open { transform: translateX(0); }
+  .scrim {
+    position: fixed; inset: 0; z-index: 80;
+    background: color-mix(in oklab, var(--ink) 45%, transparent);
+    opacity: 0; pointer-events: none; transition: opacity var(--t) var(--ease);
+  }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .menubtn { display: grid; }
+  .content { padding: 28px 18px 100px; }
+  .topbar { padding: 10px 16px; }
+  .finder { display: none; }
+  .g2, .g3 { grid-template-columns: 1fr; }
+  h2.title { font-size: 1.6rem; }
+  .strip > div { padding-right: 20px; margin-right: 20px; }
+  .row { padding: 16px 4px 16px 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+
+<a class="skip" href="#main">İçeriğe atla</a>
+
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Ana gezinme"></nav>
+  <div class="main">
+    <div class="topbar">
+      <button class="iconbtn menubtn" id="menuBtn" aria-label="Menüyü aç" aria-expanded="false">☰</button>
+      <div class="crumbs" id="crumbs" aria-label="Konum"></div>
+      <div class="finder">
+        <span class="g" aria-hidden="true">⌕</span>
+        <label for="finder" class="skip">Yanlışlarda ara</label>
+        <input id="finder" type="search" placeholder="Yanlışlarda ara…" autocomplete="off" />
+        <kbd>/</kbd>
+      </div>
+      <button class="iconbtn" id="themeBtn" aria-label="Temayı değiştir" title="Tema">◐</button>
+    </div>
+    <main class="content" id="main" tabindex="-1">
+      <div id="view" class="wrap"></div>
+    </main>
+  </div>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+
+<script>
+/* ============================================================
+   VERİ — pratik sınavlardan çıkarılan yanlışlar + resmî doğrulama
+   Kaynak: Udemy CCAF Practice Exam 1-3
+   Doğrulama: docs.anthropic.com / platform.claude.com /
+              code.claude.com / modelcontextprotocol.io
+============================================================ */
+
+const TOPICS = {
+  pe:   { name: "Prompt Engineering & Structured Output", short: "Prompt Engineering", icon: "✎",
+          blurb: "JSON şeması, few-shot, XML üretimi ve veri çıkarımı. En çok yanlış yaptığın alan — hepsinde ortak hata: <b>istem (prompt) ile rica etmek yerine sistem düzeyinde garanti kurmak</b> gerekiyor." },
+  tool: { name: "Tool Design & MCP Integration", short: "Tool Design & MCP", icon: "⚙",
+          blurb: "MCP primitifleri (Tools / Resources / Prompts), SDK sözdizimi ve araç arayüzü tasarımı. Tekrarlayan ders: <b>işi sunucu tarafında yap, modele yalnızca temiz ve minimal veri döndür</b>." },
+  cc:   { name: "Claude Code Configuration & Workflows", short: "Claude Code", icon: "⌘",
+          blurb: "CLAUDE.md hiyerarşisi, izinler, güvenlik ve otomasyon. Burada kritik bir tuzak var: kursun bir kısmı gerçek olmayan bir <code>.claudeignore</code> dosyasını doğru sayıyor." },
+  agent:{ name: "Agentic Architecture & Orchestration", short: "Agentic Architecture", icon: "◈",
+          blurb: "Çok-ajanlı desenler, orkestrasyon ve paralel araç kullanımı. Ders: güvenilirlik <b>mimariden</b> gelir — tek ajanı 'dikkatli ol' diye uyarmaktan değil." },
+  ctx:  { name: "Context Management & Reliability", short: "Context Management", icon: "▤",
+          blurb: "Bağlam penceresi yönetimi, prompt caching ve uzun iş akışlarında tutarlılık. Ders: kalıcı bilgiyi <b>her isteğe taşı</b> ve cache breakpoint'lerini doğru yere koy." },
+};
+
+const CONCEPTS = {
+  determinism: "Determinizm > olasılık",
+  tooloffload: "Sunucu-tarafı veri işleme",
+  structured: "Yapılandırılmış çıktı",
+  caching: "Prompt caching",
+  mcp: "MCP primitifleri",
+  ccsec: "Claude Code güvenlik/config",
+  thinking: "Extended / adaptive thinking",
+};
+
+/* Çalışma notları — kullanıcının dokümantasyondan derlediği püf noktaları */
+const NOTES = [
+  {
+    id: "prompt-caching", title: "Prompt Caching — Püf Noktaları", topic: "ctx", icon: "▤",
+    summary: "Etkili caching için en iyi pratikler ve senaryo bazlı optimizasyon — resmî dokümandan.",
+    source: ["Anthropic Docs — Prompt caching", "https://platform.claude.com/docs/en/build-with-claude/prompt-caching"],
+    sections: [
+      { id: "best", h: "Etkili caching için en iyi pratikler", html: `
+        <ul>
+          <li>Çok turlu sohbetlerde <b>automatic caching</b> ile başla — breakpoint yönetimini otomatik yapar.</li>
+          <li>Farklı sıklıkta değişen bölümleri ayrı cache'lemen gerekiyorsa <b>açık (explicit) blok-seviyesi breakpoint</b> kullan.</li>
+          <li>Kararlı ve yeniden kullanılan içeriği cache'le: <b>system talimatları</b>, arka plan bilgisi, büyük bağlamlar, sık kullanılan <b>tool tanımları</b>.</li>
+          <li>Cache'lenen içeriği prompt'un <b>başına</b> koy — en iyi performans.</li>
+          <li>Farklı cache'lenebilir prefix bölümlerini ayırmak için breakpoint'leri stratejik kullan.</li>
+          <li>Breakpoint'i, istekler arası <b>aynı kalan son bloğa</b> koy. Statik prefix + değişken suffix (timestamp, isteğe özel bağlam, gelen mesaj) varsa: breakpoint prefix'in <b>sonunda</b> olmalı, değişen blokta değil.</li>
+          <li>Cache <b>hit oranlarını</b> düzenli analiz et ve stratejini gerektikçe ayarla.</li>
+        </ul>` },
+      { id: "usecases", h: "Farklı senaryolar için optimizasyon", html: `
+        <ul>
+          <li><b>Conversational agents:</b> uzun talimat veya yüklenmiş belge içeren uzun sohbetlerde maliyeti ve gecikmeyi azalt.</li>
+          <li><b>Coding assistants:</b> kod tabanının ilgili bölümlerini veya özetini prompt'ta tutarak autocomplete ve codebase Q&amp;A'yı iyileştir.</li>
+          <li><b>Large document processing:</b> görseller dahil uzun içeriği, yanıt gecikmesini artırmadan prompt'a göm.</li>
+          <li><b>Detailed instruction sets:</b> kapsamlı talimat/prosedür/örnek listelerini paylaş — genelde 1-2 örnek konur ama caching ile <b>20+ çeşitli yüksek kaliteli örnek</b> ekleyerek daha iyi performans alırsın.</li>
+          <li><b>Agentic tool use:</b> her adımın yeni bir API çağrısı gerektirdiği, çok sayıda tool çağrısı ve yinelemeli kod değişikliği olan senaryolarda performansı artır.</li>
+          <li><b>Longform içerikle konuşma:</b> kitap, makale, dokümantasyon, podcast transkriptleri — belgenin tamamını prompt'a gömüp kullanıcıların soru sormasına izin ver.</li>
+        </ul>` },
+    ],
+  },
+];
+
+// M = mistakes (dahili / built-in kayıtlar)
+const M_BUILTIN = [
+  /* ---------------- EXAM 2 ---------------- */
+  {
+    id: "e2q4", exam: 2, q: 4, topic: "tool", diff: 2, concepts: ["mcp"],
+    scenario: "TypeScript'te yerel dosya işlemleri için bir MCP sunucusu yazıyorsun. 'list files' aracını MCP SDK ile hangi kod parçası doğru tanımlar?",
+    your: "server.addTool({ name: 'list files', handler: (args) => { return fs.readdirSync(args.path); } });",
+    correct: "server.tool('list files', { path: z.string() }, async ({ path }) => ({ content: [{ type: 'text', text: fs.readdirSync(path).join(' ') }] }));",
+    why: "Eski / uydurma yardımcıları (addTool, register, createTool) doğru sandın. Resmî TS SDK'da <code>McpServer</code> sınıfı var; araçlar <code>server.tool(ad, zodŞeması, async handler)</code> ile kaydedilir ve handler <b>bir <code>content</code> dizisi döndürmek zorundadır</b>.",
+    official: "Resmî MCP TypeScript SDK, argüman doğrulaması için Zod kullanan bir <code>McpServer</code> sınıfı sağlar. Araç adı, beklenen argüman şeması ve yapılandırılmış cevap döndüren bir async handler <code>server.tool()</code> ile tanımlanır.",
+    docs: [["MCP — Tools (concepts)", "https://modelcontextprotocol.io/docs/concepts/tools"], ["MCP — Architecture", "https://modelcontextprotocol.io/docs/concepts/architecture"]],
+    related: ["e2q8", "e2q37"], verdict: "ok"
+  },
+  {
+    id: "e2q5", exam: 2, q: 5, topic: "pe", diff: 2, concepts: ["structured"],
+    scenario: "Fişlerden 'Total Amount' ve 'Currency' çıkaracaksın; çıktı yalnızca XML kabul eden eski (legacy) sisteme gidecek. Nasıl ilerlemeli?",
+    your: "'Structured Output' (JSON) özelliğini kullan, sonra bir Python betiğiyle XML'e çevir.",
+    correct: "Messages API'yi, tam XML şemasını belirten bir system prompt ve few-shot örneklerle kullan.",
+    why: "Claude'un XML üretemeyeceğini varsaydın ve gereksiz bir ara katman (JSON→XML dönüştürücü) ekledin. Oysa Claude <b>XML'i natively üretir</b>; şemayı system prompt'ta tanımlayıp kaliteli few-shot örnek vermek en doğrudan yoldur.",
+    official: "Claude XML üretiminde çok yeteneklidir. Katı XML gerektiren legacy entegrasyonlarında en iyi yaklaşım: system prompt'ta tam XML şemasını tanımlamak ve yüksek kaliteli few-shot örnekler sağlamak — ara katman gerekmez.",
+    docs: [["Prompt engineering — Use XML tags", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags"], ["Use examples (few-shot)", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting"]],
+    related: ["e2q11", "e1q28"], verdict: "ok"
+  },
+  {
+    id: "e2q8", exam: 2, q: 8, topic: "tool", diff: 1, concepts: ["mcp"],
+    scenario: "MCP'de, belirli bir görev için önceden yazılmış talimat/şablon setini Claude'a sağlayan özellik hangisidir?",
+    your: "Resources",
+    correct: "Prompts",
+    why: "Resources ile Prompts'u karıştırdın. <b>Prompts</b> = sunucunun sunduğu, yeniden kullanılabilir <b>talimat/şablon</b> primitifidir. Resources ise salt-okunur <b>veri/bağlam</b> içindir. Ayrım: Prompts = şablon, Resources = veri, Tools = eylem.",
+    official: "MCP'nin 'Prompts' primitifi, sunucuların parametrik, önceden yazılmış istem şablonları sunmasını sağlar; istemciler bunları çekerek standart görevler için LLM'e hazır talimatlar verir.",
+    docs: [["MCP — Prompts", "https://modelcontextprotocol.io/docs/concepts/prompts"], ["MCP — Architecture (primitives)", "https://modelcontextprotocol.io/docs/concepts/architecture"]],
+    related: ["e2q37", "e2q4"], verdict: "ok"
+  },
+  {
+    id: "e2q11", exam: 2, q: 11, topic: "pe", diff: 2, concepts: ["determinism", "structured"],
+    scenario: "Claude'a karmaşık bir Kubernetes YAML dosyası ürettireceksin. Var olmayan API versiyonlarının halüsinasyonunu en aza indiren yaklaşım?",
+    your: "Modele 'çok dikkatli ol' ve 'API versiyonlarını iki kez kontrol et' de.",
+    correct: "System prompt'ta geçerli bir YAML dosyasının 'Gold Standard' örneğini ver.",
+    why: "Duygusal/öznel istem ('dikkatli ol') ile sorunu çözmeye çalıştın. Karmaşık teknik sözdiziminde bu zayıftır. <b>Somut referans örneği (few-shot 'gold standard')</b> modeli doğru API versiyonları ve yapıya sabitler — halüsinasyonu ciddi biçimde azaltır.",
+    official: "Few-shot prompting, YAML gibi yapılandırılmış çıktılarda halüsinasyonu azaltmanın en etkili tekniklerindendir. Prompt'a bir 'gold standard' örnek koymak modele doğru sözdizimi, şema ve API versiyonları için somut bir referans verir.",
+    docs: [["Prompt engineering — Use examples", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting"]],
+    related: ["e2q5", "e1q28", "e2q13"], verdict: "ok"
+  },
+  {
+    id: "e2q13", exam: 2, q: 13, topic: "agent", diff: 3, concepts: ["determinism"],
+    scenario: "Bir agentic sistem kod tabanında 'Güvenlik Açığı Bulma' görevi yapıyor. Güvenilirliği artıran ve yanlış-pozitifleri azaltan mimari desen?",
+    your: "Few-Shot Prompting: modele 10 açık örneği ver.",
+    correct: "Multi-Agent Consensus: üç bağımsız ajan kodu tarasın, yalnızca en az ikisinin bulduğu açıklar raporlansın.",
+    why: "Tek ajan + few-shot ile pattern tanımayı iyileştirmeye çalıştın; ama tek ajan taramaları hâlâ halüsinasyonlu açıklar üretir. Açık uçlu, riskli görevlerde <b>birden çok bağımsız ajanın consensus/oylama</b> ile çapraz doğrulaması yanlış-pozitifleri çarpıcı biçimde düşürür.",
+    official: "Güvenlik taraması gibi karmaşık, açık uçlu görevlerde consensus/voting kullanan çok-ajanlı mimariler, tek ajanlı yaklaşımlara kıyasla yanlış-pozitifleri belirgin azaltır ve güvenilirliği artırır.",
+    docs: [["Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"]],
+    related: ["e2q54", "e1q36", "e1q62"], verdict: "ok"
+  },
+  {
+    id: "e2q22", exam: 2, q: 22, topic: "cc", diff: 2, concepts: ["ccsec"],
+    scenario: "Claude Code'un 'temp/' klasöründeki tüm dosyaları ve '.log' ile biten dosyaları yok saymasını istiyorsun. .claudeignore dosyasının doğru formatı?",
+    your: "[EXCLUDE] path=temp/ ext=.log",
+    correct: "Kurs: temp/ ve *.log (gitignore sözdizimi)",
+    why: "INI-tarzı sözdizimi uydurmuşsun — o kısmı doğru eledin. ANCAK dikkat: bu sorunun tamamı sorunlu. Kursun 'doğru' cevabı <code>.claudeignore</code> dosyasını varsayıyor; <b>resmî Anthropic dokümanlarında böyle bir mekanizma yok.</b>",
+    official: "Resmî dokümanda <code>.claudeignore</code> diye bir dosya YOK. Claude Code dosya erişimini <code>.claude/settings.json</code> içindeki <code>permissions.deny</code> ile kısıtlar; ör. <code>Read(./.env)</code>. Doğru soru bu değil — doğru mekanizma için Exam 1 Q15'e bak.",
+    docs: [["Claude Code — Settings & permissions", "https://code.claude.com/docs/en/settings"]],
+    related: ["e2q27", "e1q15"], verdict: "conflict"
+  },
+  {
+    id: "e2q26", exam: 2, q: 26, topic: "pe", diff: 2, concepts: ["thinking", "structured"],
+    scenario: "Nihai JSON çıktısından önce karmaşık, çok adımlı akıl yürütme gereken bir araç kuruyorsun. Doğruluğu artırmak için hangi parametreyi açarsın?",
+    your: "'reasoning mode': 'ultra'",
+    correct: "'thinking': { 'type': 'enabled', 'budget_tokens': 2000 }",
+    why: "Uydurma bir parametre ('reasoning mode: ultra') seçtin — Claude API'de böyle bir alan yok. Doğrusu Extended Thinking'i <code>thinking</code> objesiyle açmaktır.",
+    official: "Karmaşık akıl yürütme için Extended Thinking: <code>thinking: { type: 'enabled', budget_tokens: N }</code> (min 1024, &lt; max_tokens). NOT (güncel): en yeni modeller (Opus 4.7/4.8, Sonnet 5) bunu reddeder ve <b>adaptive thinking</b> kullanır: <code>thinking: { type: 'adaptive' }</code> + <code>output_config: { effort }</code>.",
+    docs: [["Extended thinking", "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"], ["Steering thinking (adaptive)", "https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost"]],
+    related: ["e2q44", "e2q35"], verdict: "dated"
+  },
+  {
+    id: "e2q27", exam: 2, q: 27, topic: "cc", diff: 2, concepts: ["ccsec"],
+    scenario: "Claude Code'un '.env' dosyalarını asla okumamasını istiyorsun. En güvenilir yöntem?",
+    your: ".env dosyasını işletim sisteminde 'Gizli' (Hidden) yap.",
+    correct: "Kurs: '.env'i projenin .claudeignore dosyasına ekle.",
+    why: "OS'ta 'gizle' seçeneği programatik erişimi engellemez — bu kısımda haklısın. Ama kursun 'doğru' cevabı yine hayali <code>.claudeignore</code>'a dayanıyor. <b>Gerçek ve güvenilir yöntem farklı.</b>",
+    official: "Doğru yöntem: sırları environment değişkenlerine taşı + <code>.claude/settings.json</code>'da <code>permissions.deny</code> listesine <code>Read(./.env)</code>, <code>Read(./.env.*)</code> ekle. Deny → Ask → Allow hiyerarşisinde deny her zaman kazanır; kullanıcı istese bile dosya okunamaz. Ek katman: Plan Mode.",
+    docs: [["Claude Code — Settings (permissions)", "https://code.claude.com/docs/en/settings"]],
+    related: ["e2q22", "e1q15"], verdict: "conflict"
+  },
+  {
+    id: "e2q32", exam: 2, q: 32, topic: "pe", diff: 2, concepts: ["structured"],
+    scenario: "Kullanıcı 10MB'lık bir PDF'i analiz için Claude'a göndermek istiyor. Messages API bu dosyayı nasıl ele alır?",
+    your: "Geliştirici PDF'in URL'sini 'source' parametresinde gönderir.",
+    correct: "PDF metne/görsellere çevrilip 'content' bloğunun parçası olarak gönderilmelidir.",
+    why: "API'nin harici bir URL'yi çekeceğini varsaydın. Messages API dosyayı <b>content bloğu içinde</b> ister — base64 belge bloğu, çıkarılmış metin veya sayfa görselleri olarak. URL'den otomatik çekme yoktur.",
+    official: "PDF işlemek için belge verisi mesaj payload'ının content bloğuna gömülür (base64 document block, metin veya görsel). API URL'den dosya çekmez ve açık cache_control olmadan dosyaları otomatik cache'lemez.",
+    docs: [["PDF support", "https://docs.anthropic.com/en/docs/build-with-claude/pdf-support"]],
+    related: ["e2q50", "e1q28"], verdict: "ok"
+  },
+  {
+    id: "e2q35", exam: 2, q: 35, topic: "ctx", diff: 3, concepts: ["caching"],
+    scenario: "500 sayfalık bir kitabı özetlerken tasarruf için Prompt Caching kullanacaksın. Maksimum etki için 'cache_control' bloğu nereye konmalı?",
+    your: "API isteğinin 'metadata' alanına.",
+    correct: "User mesajındaki kitap metninin hemen ardına (son content bloğuna).",
+    why: "cache_control'ün metadata gibi bir yere konduğunu sandın. Aslında breakpoint <b>kendinden önceki tüm içeriği</b> cache'ler; bu yüzden büyük metnin (kitabın) <b>sonuna</b> konmalı ki 500 sayfanın tamamı cache'e yazılsın.",
+    official: "Prompt caching, belirli bir bloğa <code>cache_control</code> konarak yönetilir. Büyük bir belgeyi verimli cache'lemek için breakpoint, statik içeriğin <b>son bloğunun sonuna</b> konur; ona kadarki tüm tokenler cache'lenir.",
+    docs: [["Prompt caching", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"]],
+    related: ["e2q44", "e1q25"], verdict: "ok"
+  },
+  {
+    id: "e2q37", exam: 2, q: 37, topic: "tool", diff: 1, concepts: ["mcp"],
+    scenario: "MCP'de, canlı sunucu logu gibi zamanla değişen dinamik bir veri kaynağını Claude'un 'görmesini' sağlayan kavram hangisi?",
+    your: "Tools",
+    correct: "Resources",
+    why: "Tools ile Resources'u karıştırdın. Tools = <b>eylem/iki yönlü çağrı</b> (script çalıştırma, API sorgusu). Resources = modelin bağlam için <b>okuyabileceği veri kaynağı</b> (dosya, canlı log, DB şeması). Sürekli okunabilir veri = Resources.",
+    official: "MCP'de Resources, yerel/uzak veriyi (canlı loglar, dosyalar, uygulama durumu) modele okunabilir bağlam olarak açan mekanizmadır.",
+    docs: [["MCP — Resources", "https://modelcontextprotocol.io/docs/concepts/resources"]],
+    related: ["e2q8", "e2q4"], verdict: "ok"
+  },
+  {
+    id: "e2q39", exam: 2, q: 39, topic: "cc", diff: 1, concepts: ["ccsec"],
+    scenario: "Claude Code'da mevcut tüm araçları ve yapılandırmalarını görmek istiyorsun. Hangi komut?",
+    your: "claude list-tools",
+    correct: "Kurs: claude config (veya interaktif /config)",
+    why: "<code>claude list-tools</code> sezgisel ama gerçek değil — bunu eledin. Kursun cevabı 'claude config' pratikte kabaca doğru yönde ama güncel değil.",
+    official: "Güncel Claude Code'da yapılandırma interaktif <code>/config</code>, MCP sunucuları için <code>/mcp</code> veya CLI'de <code>claude mcp list</code> ile görülür. İzinler için <code>/permissions</code>. Tek bir 'tüm config' komutu yerine bunlar kullanılır.",
+    docs: [["Claude Code — CLI reference", "https://code.claude.com/docs/en/cli-reference"], ["Claude Code — Settings", "https://code.claude.com/docs/en/settings"]],
+    related: ["e2q22", "e1q54"], verdict: "dated"
+  },
+  {
+    id: "e2q44", exam: 2, q: 44, topic: "ctx", diff: 1, concepts: ["caching"],
+    scenario: "Tek bir Messages API isteğinde izin verilen maksimum 'cache breakpoint' sayısı kaçtır?",
+    your: "10",
+    correct: "4",
+    why: "Limiti fazla tahmin ettin. Backend cache verimliliği için sınır düşüktür: <b>istek başına en fazla 4</b> cache_control breakpoint. 5.'yi eklersen 400 hatası alırsın.",
+    official: "Anthropic API'de istek başına en fazla 4 cache breakpoint tanımlanabilir; bunlarla system prompt, tools veya mesaj geçmişinin farklı bölümleri optimum cache'lenir.",
+    docs: [["Prompt caching (breakpoints)", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"]],
+    related: ["e2q35", "e1q25"], verdict: "ok"
+  },
+  {
+    id: "e2q50", exam: 2, q: 50, topic: "pe", diff: 2, concepts: ["structured"],
+    scenario: "Messages API'de, bir araç çalıştırmasının sonucunu içeren mesaj hangi 'role' ile gönderilmelidir?",
+    your: "tool",
+    correct: "user",
+    why: "OpenAI'daki gibi bir <code>tool</code> rolü olduğunu varsaydın. Anthropic API'de <b>ayrı bir tool rolü yoktur</b>. Araç sonucu, <code>user</code> rolündeki mesajın içinde bir <code>tool_result</code> content bloğu olarak gönderilir.",
+    official: "Anthropic Messages API katı biçimde user/assistant rollerini dönüşümlü kullanır. Model bir aracı çağırdığında, uygulama sonucu <code>user</code> rolüyle, <code>tool_result</code> content bloğu içinde geri gönderir.",
+    docs: [["Tool use — handling results", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e2q54", "e1q46"], verdict: "ok"
+  },
+  {
+    id: "e2q54", exam: 2, q: 54, topic: "agent", diff: 2, concepts: ["structured", "determinism"],
+    scenario: "Bir Koordinatör, 'Reviewer' ajanının her zaman yapılandırılmış rapor üretmesini garanti etmek için hangi 'tool_choice'u kullanmalı?",
+    your: "{ 'type': 'any' }",
+    correct: "{ 'type': 'tool', 'name': 'submit_review' }",
+    why: "<code>any</code> modeli bir araç kullanmaya zorlar ama <b>hangi aracı</b> seçeceğini garanti etmez. Belirli bir şemayı garanti etmek için <code>type: 'tool'</code> + tam <code>name</code> ile o aracı zorlarsın.",
+    official: "Agentic akışta Koordinatör, alt-ajandan yapılandırılmış çıktıyı <code>tool_choice</code> ile dayatabilir. Tip 'tool' ve tam tool adı verildiğinde model o spesifik aracı çağırmak zorunda kalır; çıktı önceden tanımlı şemaya uyar.",
+    docs: [["Tool use — forcing tool use", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e2q50", "e1q28", "e2q13"], verdict: "ok"
+  },
+  {
+    id: "e2q57", exam: 2, q: 57, topic: "tool", diff: 3, concepts: ["tooloffload"],
+    scenario: "Bir MCP sunucusu Claude'un bağlamına 50MB'lık bir CSV döndürüyor. Claude yanıt vermez oluyor ve hata yapıyor. Mimar neyi değiştirmeli?",
+    your: "'max_tokens' parametresini 1.000.000'a çıkar.",
+    correct: "MCP sunucusu bir 'summarize_data' aracı uygulamalı ya da 'search' fonksiyonuyla yalnızca ilk 100 satırı döndürmeli.",
+    why: "max_tokens'ın <b>giriş</b> bağlamını değil <b>çıkış</b> uzunluğunu kontrol ettiğini kaçırdın; ayrıca 50MB ham veri her hâlükârda performansı düşürür. Doğrusu: <b>veri işleme yükünü sunucuya kaydır</b>, modele yalnızca özet/filtreli veri döndür.",
+    official: "Büyük ham veri seti bağlamı şişirir ('lost in the middle') ve yanıtı yavaşlatır. En iyi pratik: veriyi özetleyen/filtreleyen/sorgulayan sunucu-tarafı araçlar kurup modele yalnızca gerekli özlü bilgiyi döndürmek.",
+    docs: [["MCP — Tools", "https://modelcontextprotocol.io/docs/concepts/tools"], ["Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"]],
+    related: ["e1q1", "e1q11"], verdict: "ok"
+  },
+
+  /* ---------------- EXAM 1 ---------------- */
+  {
+    id: "e1q1", exam: 1, q: 1, topic: "tool", diff: 2, concepts: ["tooloffload"],
+    scenario: "Çok-ajanlı sistemde 'Summarizer' alt-ajanı, 'Source Retrieval' ajanının çıktısındaki alakasız metadata'yı özetine katıyor. En etkili mimari düzeltme?",
+    your: "Source Retrieval çıktısını orkestratör seviyesinde filtrele, Summarizer'a vermeden önce metadata alanlarını çıkar.",
+    correct: "Source Retrieval aracını yalnızca ilgili içerik alanlarını döndürecek şekilde tasarla (tam metadata objesini değil).",
+    why: "Orkestratörde filtrelemek 'ignore et' demekten iyi ama veri dönüşümünü <b>yanlış katmana</b> koyuyor. En temiz mimari: sorunu <b>kaynağında</b> çöz — aracın çıktı şeması yalnızca downstream'in ihtiyacını döndürsün (article_text, title, date; database_id/headers hariç).",
+    official: "Çok-ajanlı boru hatlarında 'kaynağında temiz veri' temel bir desendir. Her araç tam olarak downstream'in ihtiyacı olanı döndürmeli — ne eksik ne fazla. Bu, sorunu aşağı akışta filtreleyerek/talimatla değil kaynağında ortadan kaldırır.",
+    docs: [["Tool use — best practices for tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use"]],
+    related: ["e2q57", "e1q11"], verdict: "ok"
+  },
+  {
+    id: "e1q11", exam: 1, q: 11, topic: "tool", diff: 2, concepts: ["tooloffload"],
+    scenario: "Bir 'Researcher Agent' çok büyük ve dağınık HTML tabloları döndüren legacy bir API'den veri çekecek. En iyi araç tasarımı?",
+    your: "Prompt engineering ile ajana HTML tablolarından veri çıkarmayı öğret.",
+    correct: "HTML'i çeken, yapılandırılmış veriyi ayıklayıp temiz bir JSON objesi döndüren sunucu-tarafı bir araç oluştur.",
+    why: "HTML ayrıştırmayı modele bıraktın — her çağrıda ham HTML'i yeniden parse etmesi kırılgan ve token-pahalıdır; yapı değişince sessizce bozulur. Doğrusu: dönüşümü <b>araç içinde (BeautifulSoup/Cheerio)</b> yapıp modele temiz JSON döndürmek.",
+    official: "Araç tasarımının temel ilkesi: veri modele ulaşmadan önce sunucu tarafında maksimum işi yap. Legacy HTML için: aracın içinde çek → parse et → ilgili satır/sütunu ayıkla → temiz tipli JSON döndür. Model az token, düşük gecikme, düşük hata ile çalışır.",
+    docs: [["Tool use — best practices for tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use"]],
+    related: ["e1q1", "e2q57"], verdict: "ok"
+  },
+  {
+    id: "e1q15", exam: 1, q: 15, topic: "cc", diff: 3, concepts: ["ccsec"],
+    scenario: "Bir geliştirici, hassas API anahtarları içeren özel bir repoyu Claude Code ile refactor edecek. Anahtarların kazara açığa çıkmasını nasıl önler?",
+    your: "PreToolUse hook ile .env/secrets dosyalarını dosya-adı desenine göre engelle.",
+    correct: "Sırları env değişkenlerine taşı; hassas dosya desenlerini .claude/settings.json'daki permissions.deny listesine ekle (ör. Read(.env), Read(.env.*)); hassas oturumlarda Plan Mode.",
+    why: "PreToolUse hook güçlü bir defense-in-depth katmanı — 'kısmen doğru'. Ama resmen önerilen daha basit, deklaratif yol <code>settings.json</code>'daki <code>permissions.deny</code>'dır. <b>Bu soru, Exam 2 Q22/Q27'deki hayali .claudeignore'un doğrusunu veriyor.</b>",
+    official: "Defense-in-depth: (1) sırlar env değişkenlerinde; (2) <code>permissions.deny</code> bloğu <code>Read(.env)</code>/<code>Read(.env.*)</code> gibi desenleri fiziksel engeller — kullanıcı istese bile; (3) Plan Mode salt-okunur oturum. Deny → Ask → Allow hiyerarşisi CLI motorunda dayatılır.",
+    docs: [["Claude Code — Settings (permissions)", "https://code.claude.com/docs/en/settings"]],
+    related: ["e2q22", "e2q27"], verdict: "authoritative"
+  },
+  {
+    id: "e1q25", exam: 1, q: 25, topic: "ctx", diff: 2, concepts: ["caching"],
+    scenario: "Java→Python 'Code Migrator'ında, model birçok dosya işleyince kararlaştırılmış adlandırma/kalıpları 'unutuyor'. En etkili çözüm?",
+    your: "Projeyi küçük parçalara böl ve paralel işle.",
+    correct: "Kararlaştırılmış adlandırma ve kalıpları içeren bir 'style guide' belgesini her API isteğinin başına ekle.",
+    why: "Paralel işleme hız verir ama tutarlılığı çözmez — her paralel istek bağımsızdır ve kendi konvansiyonunu türetir. Çözüm: gereksinimleri kalıcı bir belgeye <b>dışsallaştır</b> ve her isteğin system prompt'una ekle (ideal olarak <code>cache_control</code> ile).",
+    official: "Uzun iş akışlarında tutarlılık için gereksinimleri kalıcı bir artefakta dışsallaştır. Style guide'ı her isteğin system prompt'una, <code>cache_control: {type:'ephemeral'}</code> ile koy: her zaman mevcut olur ve caching maliyeti ~%10'a düşürür.",
+    docs: [["Prompt caching", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"]],
+    related: ["e2q35", "e2q44"], verdict: "ok"
+  },
+  {
+    id: "e1q28", exam: 1, q: 28, topic: "pe", diff: 3, concepts: ["structured", "determinism"],
+    scenario: "Karmaşık sözleşmelerden iç içe dizi/obje içeren belirli bir JSON şemasına çıkarım yapıyorsun; Claude bazen şemadan sapıyor. En güvenilir çözüm?",
+    your: "Ayrıntılı system prompt + JSON üretmeden önce chain-of-thought akıl yürütme.",
+    correct: "Claude'un native JSON şema dayatmasını kullan (tanımlı şemayla tool_choice), çıktıyı tam yapıya kısıtla.",
+    why: "CoT doğruluğu artırır ama hâlâ <b>olasılıksal</b> bir prompt yaklaşımıdır; kenar durumlarda sapar. Üretimde garanti için şema dayatması gerekir: iç içe şemayı tool'un <code>input_schema</code>'sı yap, <code>tool_choice: {type:'tool', name:...}</code> ile zorla, gerekirse <code>strict: true</code>.",
+    official: "Karmaşık iç içe şemalarda garanti için Claude'un tool tanımlarıyla yapılandırılmış çıktı modu yetkili yaklaşımdır: şemayı input_schema olarak tanımla, tool_choice ile aracı zorla, <code>strict: true</code> ile argümanların şemaya birebir uymasını garantile. Şema uyumu olasılıksal hedeften sistem düzeyinde kısıta dönüşür.",
+    docs: [["Tool use — strict tool use", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"], ["Structured outputs", "https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs"]],
+    related: ["e2q54", "e2q11", "e1q46"], verdict: "ok"
+  },
+  {
+    id: "e1q36", exam: 1, q: 36, topic: "agent", diff: 3, concepts: ["determinism"],
+    scenario: "Üretimde vakaların %12'sinde ajan get_customer'ı atlayıp yalnızca müşterinin söylediği adla lookup_order çağırıyor; bazen yanlış hesap ve yanlış iade oluyor. En etkili düzeltme?",
+    your: "Ajanın her zaman önce get_customer çağırmasını gösteren few-shot örnekler ekle.",
+    correct: "get_customer doğrulanmış bir customer ID döndürene dek lookup_order ve process_refund çağrılarını engelleyen programatik bir ön koşul ekle.",
+    why: "Few-shot örnekler yalnızca <b>olasılığı</b> artırır — kalan %12'yi ya da yeni kenar durumları engelleyemez. Güvenlik/doğruluk belirli bir araç sırasına bağlıysa tek deterministik çözüm sırayı <b>uygulama katmanında</b> dayatmaktır (programatik gate).",
+    official: "Üretimde güvenlik belirli bir araç çağrı sırasına bağlıysa tek güvenilir yol sırayı programatik dayatmaktır — prompt'la değil. Programatik ön koşullar (get_customer başarılı olmadan lookup_order engellenir) model drift'i veya prompt injection'ın bozamayacağı deterministik garantiler kurar.",
+    docs: [["Tool use — best practices for tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use"], ["Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"]],
+    related: ["e2q13", "e2q54", "e1q53"], verdict: "ok"
+  },
+  {
+    id: "e1q46", exam: 1, q: 46, topic: "pe", diff: 2, concepts: ["structured"],
+    scenario: "Claude ile araştırma asistanı kuruyorsun: bazı yanıtlar katı yapılandırılmış formatta olmalı ama kullanıcı doğal takip soruları da sorabilmeli. En iyi yaklaşım?",
+    your: "'tool_choice: required' kullan ve çıktı formatını tek araç yap; her yanıtı şemadan geçir.",
+    correct: "İki farklı API konfigürasyonu arasında geçiş yap: biri yapılandırılmış çıktı için (tool_choice ile), diğeri sohbet yanıtları için (tool_choice olmadan).",
+    why: "'required' her yanıtı — sohbet dahil — şemaya sokar ve doğal konuşmayı bozar. Karma iş akışında uygulama katmanı, dönüş tipine göre doğru konfigürasyonu seçmeli: yapılandırılmış tur → tool_choice; sohbet turu → standart istek.",
+    official: "Karma iş akışları en iyi, dönüş tipine göre API konfigürasyonunu değiştirerek ele alınır. Uygulama her turu sınıflandırır: yapılandırılmış turlar tanımlı şemayla tool_choice; sohbet turları standart mesaj isteği. Şema dayatması korunurken doğal konuşma kalitesi bozulmaz.",
+    docs: [["Tool use — overview", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e1q28", "e2q50", "e2q54"], verdict: "ok"
+  },
+  {
+    id: "e1q53", exam: 1, q: 53, topic: "pe", diff: 3, concepts: ["structured", "determinism"],
+    scenario: "Binlerce tıbbi faturayı işleyen bir çıkarım hattında, el yazısı notlar bazen bozuk JSON'a yol açıyor. Üretim yükü için güvenilirlik/verimlilik dengesi en iyi strateji?",
+    your: "El yazısı notu içeren her faturayı işlemeden önce elle incele.",
+    correct: "JSON hatalarını yakalayıp hata mesajını düzeltme için modele geri gönderen bir doğrulama-yeniden deneme (validation-retry) döngüsü uygula.",
+    why: "Elle inceleme en güvenilir ama en verimsiz — binlerce faturada otomasyonu öldürür. Standart üretim deseni: çıktıyı parse et, başarısızsa spesifik hata mesajını modele geri besle, N kez dene, sonra insana yükselt.",
+    official: "Doğrulama-yeniden deneme döngüsü, üretim yapılandırılmış çıkarımının anahtar desenidir: (1) modeli çağır, JSON iste; (2) parse et; (3) başarısızsa spesifik parse hatasını içeren takip isteği; (4) N deneme sonra insana yükselt. Zor girdilerin uzun kuyruğunu otomatik ele alır ve yüksek verimi korur.",
+    docs: [["Tool use — error handling", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e1q36", "e1q28"], verdict: "ok"
+  },
+  {
+    id: "e1q54", exam: 1, q: 54, topic: "cc", diff: 2, concepts: ["ccsec"],
+    scenario: "Bir kullanıcı 5.000 dosyada devasa bir ara-değiştir (search-and-replace) yapmak için Claude Code kullanmak istiyor. En token-verimli yaklaşım?",
+    your: "Her dosyayı ayrı bir batch isteği olarak Message Batches API ile gönder.",
+    correct: "Claude Code'un headless modunu (claude -p) betiklenmiş bir prompt ile programatik kullan.",
+    why: "Message Batches API bağımsız, asenkron API istekleri içindir; dosya sistemi erişimi, araç çalıştırma ortamı ve orkestrasyon sağlamaz. Dosya değişimi Claude Code ortamı ister. Doğrusu: <code>claude -p</code> (print/headless) mod — her çağrı taze, sınırlı bağlamla bir shell betiğinden döngüde çalışır.",
+    official: "Claude Code'un headless modu (<code>-p</code>) betiklenmiş, etkileşimsiz çalıştırma sağlar; otomatik toplu işlemler için idealdir. 5.000 dosya deseni: dosyaları gruplayan bir shell betiği yaz, her grup için <code>claude -p '…'</code> çağır — her çağrının taze, sınırlı bağlamı olur.",
+    docs: [["Claude Code — CLI reference (-p / print mode)", "https://code.claude.com/docs/en/cli-reference"]],
+    related: ["e2q39", "e1q62"], verdict: "ok"
+  },
+  {
+    id: "e1q62", exam: 1, q: 62, topic: "agent", diff: 2, concepts: ["determinism"],
+    scenario: "Bir ajan 10 adımlık araştırma görevini sırayla işlediği için yavaş. Adım 3, 4 ve 5 birbirinden bağımsız web aramaları. Performans için nasıl yeniden tasarlanır?",
+    your: "Üç ayrı ajan örneği başlat ve sonuçlarını birleştir.",
+    correct: "Ajanı, üç bağımsız arama tool çağrısını tek bir yanıt turunda birlikte yapacak şekilde yönlendir (paralel tool use).",
+    why: "Ayrı ajan örnekleri gereksiz yük getirir (her biri kendi bağlam kurulumu, system prompt). Claude tek turda <b>birden çok tool_use bloğu</b> döndürebilir; uygulama üçünü paralel çalıştırıp sonuçları birlikte döndürür. Üç ardışık gidiş-dönüş, tek paralel gidiş-dönüşe iner.",
+    official: "Paralel tool use, I/O-bağlı adımlar için anahtar performans optimizasyonudur: model bağımsız adımları tanır, tek yanıtta birden çok tool_use bloğu koyar, uygulama hepsini eşzamanlı çalıştırıp tüm tool_result bloklarını tek turda geri gönderir. Toplam gecikme en yavaş tek çağrıyla sınırlıdır, çağrıların toplamıyla değil.",
+    docs: [["Tool use — parallel tool use", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/parallel-tool-use"]],
+    related: ["e2q13", "e1q54"], verdict: "ok"
+  },
+
+  /* ---------------- EXAM 3 ---------------- */
+  {
+    id: "e3q1", exam: 3, q: 1, topic: "cc", diff: 1, concepts: ["ccsec"],
+    scenario: "Bir geliştirici Claude Code ile sıfırdan proje kurmak istiyor. Ajanın tüm gereksinimleri anlaması için hangi komutu kullanmalı?",
+    your: "claude --init",
+    correct: "claude 'Build a project based on the requirements in requirements.txt'",
+    why: "<code>--init</code>'in projeyi kurma talimatı verdiğini sandın; oysa o (varsa) yapılandırma başlatır. Claude Code'a işi <b>doğal dil prompt</b>'uyla, ilgili gereksinim dosyasına işaret ederek anlatırsın — ajan dosyayı okuyup tam bağlamı yükler.",
+    official: "Claude Code doğal dil promptlarıyla yönlendirilir; bir gereksinim dosyasına açıkça işaret eden bir prompt, ajanın doğru bağlamı yükleyip geliştiricinin hedefleriyle hizalanmasını sağlar.",
+    docs: [["Claude Code — Overview", "https://code.claude.com/docs/en/overview"]],
+    related: ["e3q15", "e3q32", "e2q39"], verdict: "ok"
+  },
+  {
+    id: "e3q3", exam: 3, q: 3, topic: "tool", diff: 2, concepts: ["mcp", "tooloffload"],
+    scenario: "Bir MCP sunucu aracı 10 saniye sonra sürekli timeout veriyor. Geliştirici timeout limitini artırmak için nereye bakmalı?",
+    your: "MCP sunucusunun TypeScript kodunda.",
+    correct: "İstemcinin (Client) yapılandırmasında (ör. Claude Desktop veya özel SDK ayarları).",
+    why: "İşi sunucu yaptığı için timeout'un da orada olduğunu varsaydın. MCP'de <b>istek istemciden başlar</b>; bağlantıyı iptal eden timeout eşiği istemci tarafında yönetilir. Not: şıklardan biri yine hayali <code>.claudeignore</code>'a atıf yapıyor — o dosya gerçek değil.",
+    official: "MCP'de istemci sunucuya istek başlatır. Araç çok uzun sürerse istemcinin timeout yapılandırması isteği iptal eder; bu yüzden ayar istemci (ör. Claude Desktop) tarafında yapılır.",
+    docs: [["MCP — Tools", "https://modelcontextprotocol.io/docs/concepts/tools"]],
+    related: ["e3q19", "e2q57"], verdict: "ok"
+  },
+  {
+    id: "e3q8", exam: 3, q: 8, topic: "pe", diff: 1, concepts: ["structured"],
+    scenario: "Bir araç tanımında, modelin belirli bir argümana değer sağlamasını garanti etmek için hangi JSON Schema özelliği kullanılır?",
+    your: "'optional': false",
+    correct: "'required': [ 'argument-name' ]",
+    why: "Uydurma/geçersiz anahtarlar (optional, is-mandatory) doğru sandın. JSON Schema'da zorunlu alanlar <code>required</code> dizisiyle listelenir — Claude tool tanımları standart JSON Schema kullanır.",
+    official: "Claude için tanımlanan araçlar standart JSON Schema kullanır; <code>required</code> dizisi, aracı çağırırken modelin sağlaması gereken özellikleri belirtir.",
+    docs: [["Tool use — tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e1q28", "e2q54"], verdict: "ok"
+  },
+  {
+    id: "e3q15", exam: 3, q: 15, topic: "cc", diff: 1, concepts: ["ccsec"],
+    scenario: "Bir ajan çok adımlı stratejisini bir dosyaya yazan 'Plan-to-File' deseni uyguluyor. Claude Code ortamında bunun standart dosya adı hangisidir?",
+    your: "instructions.json",
+    correct: "CLAUDE.md",
+    why: "Rastgele bir JSON adı seçtin. Claude Code'da proje talimatları, hafıza ve plan/strateji için tanınan standart dosya <code>CLAUDE.md</code>'dir.",
+    official: "Claude Code ortamında CLAUDE.md, projeye özgü talimatlar, hafıza ve strateji planları (Plan-to-File dahil) için standart kuraldır.",
+    docs: [["Claude Code — Memory (CLAUDE.md)", "https://code.claude.com/docs/en/memory"]],
+    related: ["e3q1", "e3q32", "e3q43"], verdict: "ok"
+  },
+  {
+    id: "e3q19", exam: 3, q: 19, topic: "tool", diff: 2, concepts: ["tooloffload"],
+    scenario: "Bir MCP sunucusu yavaş bir legacy veritabanına erişim sağlıyor; sonuçlar 30 saniyede dönüyor. Araç nasıl tasarlanmalı?",
+    your: "Araç 30 saniye boyunca ajanı bloklamalı.",
+    correct: "Araç bir 'email' parametresi alıp sorgu bitince sonuçları asenkron göndermeli.",
+    why: "Senkron bloklama ağ timeout'una ve yanıt vermeyen bir ajan döngüsüne yol açar (anti-pattern). Uzun süren işlemleri <b>asenkron</b> (email/webhook callback) tasarlamak ajan döngüsünü bloklamadan sonucu teslim eder.",
+    official: "Çok uzun süren araçlarda senkron bloklama istemci timeout'una neden olabilir. En iyi pratik, sonucu ajan döngüsünü bloklamadan teslim eden bir callback (email/webhook) ile aracı asenkron tasarlamaktır.",
+    docs: [["MCP — Tools", "https://modelcontextprotocol.io/docs/concepts/tools"]],
+    related: ["e3q3", "e2q57"], verdict: "ok"
+  },
+  {
+    id: "e3q30", exam: 3, q: 30, topic: "pe", diff: 2, concepts: ["structured"],
+    scenario: "Aşağıdakilerden hangisi Messages API için bir tool result'ı doğru biçimlendirir?",
+    your: "{ 'type': 'tool-output', 'id': 'id-123', 'data': 'Success' }",
+    correct: "{ 'type': 'tool_result', 'tool_use_id': 'id-123', 'content': 'Success' }",
+    why: "Uydurma anahtarlar (tool-output, data, id) kullandın. Doğru yapı: tip <code>tool_result</code>, <code>tool_use_id</code> ve <code>content</code>. (Bu blok <code>user</code> rolündeki mesaj içinde döner — bkz. Exam 2 Q50.)",
+    official: "Anthropic Messages API'de tool sonuçları <code>tool_result</code> tipli bir content bloğunda, <code>tool_use_id</code> ve <code>content</code> ile döner.",
+    docs: [["Tool use — tool_result block", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e2q50", "e1q46"], verdict: "ok"
+  },
+  {
+    id: "e3q32", exam: 3, q: 32, topic: "cc", diff: 2, concepts: ["ccsec"],
+    scenario: "Bir geliştirici Claude Code ile refactor yaparken Claude'un kurulu olmayan bir kütüphaneyi kullanmaya çalıştığını fark ediyor. Nasıl düzeltilir?",
+    your: "Kütüphanenin dokümantasyonunu yerel 'node-modules' klasöründen sil.",
+    correct: "'CLAUDE.md'yi 'Allowed Libraries' ve 'Forbidden Libraries' listesiyle güncelle.",
+    why: "node_modules'tan doküman silmek modelin davranışını çözmez, ortamı bozar. Kalıcı proje kuralları için <code>CLAUDE.md</code>'ye izinli/yasak kütüphaneleri yaz — Claude Code bunu otomatik okur. (Şıklardan biri yine hayali <code>.claudeignore</code>'a atıf yapıyor.)",
+    official: "CLAUDE.md, Claude Code tarafından proje bağlamını anlamak için otomatik okunur; açık kütüphane kısıtları eklemek davranışı yönlendirmenin doğru yoludur.",
+    docs: [["Claude Code — Memory (CLAUDE.md)", "https://code.claude.com/docs/en/memory"]],
+    related: ["e3q1", "e3q15", "e2q22"], verdict: "ok"
+  },
+  {
+    id: "e3q39", exam: 3, q: 39, topic: "tool", diff: 2, concepts: ["mcp"],
+    scenario: "Yerel Claude Desktop geliştiricileri ve bulut orkestrasyonları tarafından kullanılacak bir MCP sunucusu tasarlıyorsun. İki ortamda uyumluluk için hangi iki transport protokolü desteklenmeli? (İki seçin)",
+    your: "gRPC (SSE'yi doğru işaretledin ama STDIO'yu kaçırdın)",
+    correct: "STDIO (yerel süreç iletişimi) + HTTP with Server-Sent Events / Streamable HTTP (uzak/bulut)",
+    why: "gRPC'yi MCP standardı sandın — değil. MCP iki resmî transport tanımlar: yerel için <b>STDIO</b>, uzak için <b>HTTP</b>. Güncel not: uzak transport artık 'Streamable HTTP' olarak adlandırılıyor; SSE onun eski adıdır.",
+    official: "MCP iki resmî transport belirtir: yerel süreçler arası iletişim için STDIO ve uzak/bulut bağlantıları için HTTP (güncel adıyla Streamable HTTP; opsiyonel SSE ile). WebSocket ve gRPC standart değildir.",
+    docs: [["MCP — Architecture (transports)", "https://modelcontextprotocol.io/docs/concepts/architecture"]],
+    related: ["e2q8", "e2q37"], verdict: "dated"
+  },
+  {
+    id: "e3q42", exam: 3, q: 42, topic: "pe", diff: 2, concepts: ["structured", "determinism"],
+    scenario: "'tool_choice' ile 'forced tool use' kullanırken mimarın dikkate alması gereken temel bir sınırlama nedir?",
+    your: "Model o turda başka hiçbir aracı kullanamaz.",
+    correct: "Model, araç çağrısından önce sohbet/açıklama ('thought') üretmeyi büyük olasılıkla atlar.",
+    why: "Asıl mimari dezavantaj 'başka araç yasağı' değil, <b>akıl yürütmenin (chain-of-thought) kaybı</b>. Belirli bir aracı zorlayınca model doğrudan tool çağrısını basar; bu, üretilen parametrelerin kalitesini düşürebilir. Denge: garanti ↔ akıl yürütme.",
+    official: "Bir araç tool_choice ile zorlandığında Claude genellikle tool bloğunu hemen üretir; bu, tool çağrılarından önceki iç akıl yürütmeyi baypas eder ve üretilen parametrelerin doğruluğunu düşürebilir.",
+    docs: [["Tool use — forcing tool use", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    related: ["e2q54", "e1q28", "e3q8"], verdict: "ok"
+  },
+  {
+    id: "e3q43", exam: 3, q: 43, topic: "cc", diff: 2, concepts: ["ccsec"],
+    scenario: "Bir geliştirici Claude Code'un dosya düzenlerken kullandığı varsayılan editörü değiştirmek istiyor. Hangi yapılandırma yöntemi doğru?",
+    your: "'config.json'u 'editor-path': '/usr/bin/vim' ile güncelle.",
+    correct: "Claude Code dosya düzenleme için kendi dahili agentic araçlarını kullanır; harici bir 'EDITOR' değişkenine dayanmaz.",
+    why: "Harici bir editör yolu yapılandırılabileceğini varsaydın. Claude Code dosyaları kendi araçlarıyla (View/Edit/Bash) okur ve değiştirir; sistem EDITOR değişkenini veya bir editor-path'i kullanmaz.",
+    official: "Claude Code dosya değişikliklerini kendi entegre agentic araç setiyle yapar (dahili dosya değiştirme, bash) ve harici bir metin editörü arayüzüne dayanmaz.",
+    docs: [["Claude Code — Overview", "https://code.claude.com/docs/en/overview"]],
+    related: ["e3q1", "e3q63"], verdict: "ok"
+  },
+  {
+    id: "e3q48", exam: 3, q: 48, topic: "ctx", diff: 2, concepts: ["caching"],
+    scenario: "300 sayfalık bir PDF işleyen uzun-bağlam hattında, tekrarlı sorguların maliyet/performansını Prompt Caching ile optimize edeceksin. Verimli uygulama için hangi iki strateji gerekli? (İki seçin)",
+    your: "cache_control'ü doğru işaretledin ama 'çıktı tokenlerini cache'le' seçtin (yanlış)",
+    correct: "(1) cache_control breakpoint'i büyük PDF bloğunun sonuna koy; (2) statik PDF içeriğini başa, dinamik sorguyu sona koy.",
+    why: "Prompt caching yalnızca <b>giriş</b> tokenlerini cache'ler, çıktıyı değil. İki kural: büyük statik içerik başta + breakpoint onun sonunda; dinamik kısım (sorgu/timestamp) en sonda — yoksa prefix değişir ve cache baştan kurulur.",
+    official: "Etkili caching için prompt büyük statik içerikle (belge/system prompt) başlamalı, ardından cache_control breakpoint gelmeli; dinamik ögeler (timestamp/sorgu) sona eklenmeli ki cache'lenen prefix geçersizleşmesin. Caching yalnızca giriş tokenlerini kapsar.",
+    docs: [["Prompt caching", "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"]],
+    related: ["e2q35", "e2q44", "e1q25"], verdict: "ok"
+  },
+  {
+    id: "e3q56", exam: 3, q: 56, topic: "agent", diff: 2, concepts: ["determinism", "tooloffload"],
+    scenario: "Bir koordinatör ajan 'Search' ve 'Writer' işçilerine alt-görev dağıtıyor. Writer, Search'ün verisine erişemediği için genel yanıtlar üretiyor. Bu veri-akışı sorununu hangi iki mimari değişiklik çözer? (İki seçin)",
+    your: "Paylaşımlı kalıcı depoyu doğru işaretledin ama 'extended thinking' seçtin (yanlış)",
+    correct: "(1) İki alt-ajanın okuyup yazabileceği paylaşımlı kalıcı depo/durum dosyası; (2) koordinatör Search çıktısını açıkça ayrıştırıp Writer'ın prompt'una eklesin.",
+    why: "Alt-ajanlar <b>durumsuzdur (stateless)</b> ve otomatik bağlam/hafıza paylaşmaz; extended thinking veya max_tokens bunu değiştirmez. Ya koordinatör çıktıyı elle aktarır, ya da ortak bir durum dosyası/DB kullanılır.",
+    official: "Çok-ajanlı sistemlerde ajanlar izole ve durumsuzdur; global hafıza paylaşmazlar. Veri aktarımı için koordinatör bir ajanın çıktısını çıkarıp diğerinin prompt'una koymalı, ya da paylaşımlı bir DB/durum logu kullanılmalıdır.",
+    docs: [["Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"]],
+    related: ["e1q1", "e2q13"], verdict: "ok"
+  },
+  {
+    id: "e3q63", exam: 3, q: 63, topic: "cc", diff: 3, concepts: ["ccsec"],
+    scenario: "Claude Code'da kod formatlamayı otomatikleştirmek ve kural ihlali olan commit'leri önlemek için yaşam döngüsü hook'ları yapılandıracaksın. Hangi iki eylem Claude Code hook sistemi tarafından desteklenir? (İki seçin)",
+    your: "PreToolUse hook'u doğru işaretledin ama 'kullanıcı girişini yakalayan global hook' seçtin (yanlış)",
+    correct: "(1) Hook betiklerini .claude/hooks/ dizininde sakla; (2) bash çalıştırmadan önce denetleyen bir PreToolUse hook yapılandır.",
+    why: "Hook'lar kullanıcı sohbet girdisini değil, <b>araç çağrılarını (tool invocations)</b> yakalar. PreToolUse hook bir bash/write eylemini çalışmadan önce denetleyip sıfır-dışı çıkış koduyla engelleyebilir; betikler .claude/hooks/ altında tutulur (ve settings.json'da tanımlanır).",
+    official: "Claude Code, eylemleri doğrulamak/kısıtlamak için yaşam döngüsü hook'ları (ör. PreToolUse) yapılandırmanı sağlar; hook betikleri .claude/hooks/ dizininde tutulur ve settings.json'da bağlanır. PreToolUse hook write/bash eylemlerini engelleyebilir.",
+    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks"]],
+    related: ["e1q15", "e2q22"], verdict: "ok"
+  },
+];
+
+/* ---- Türetilmiş + kullanıcı içe-aktarım verileri ---- */
+const EXAMS_BUILTIN = {
+  1: { name: "Practice Exam 1", attempt: "Deneme 4", total: 65, correct: 55, wrong: 10 },
+  2: { name: "Practice Exam 2", attempt: "Deneme 3", total: 60, correct: 44, wrong: 16 },
+  3: { name: "Practice Exam 3", attempt: "Deneme 2", total: 65, correct: 52, wrong: 13 },
+};
+
+/* ============================================================
+   DURUM — built-in kayıtlar + localStorage içe-aktarımı
+============================================================ */
+
+const LS_KEY = "ccaf_imported_v2";
+
+function loadStore(){
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+    return { mistakes: s.mistakes || [], exams: s.exams || {} };
+  } catch (e) { return { mistakes: [], exams: {} }; }
+}
+function persist(){ try { localStorage.setItem(LS_KEY, JSON.stringify(STORE)); } catch (e) {} }
+
+let STORE = loadStore();
+let M = M_BUILTIN.concat(STORE.mistakes);
+let EXAMS = Object.assign({}, EXAMS_BUILTIN, STORE.exams);
+function rebuild(){
+  M = M_BUILTIN.concat(STORE.mistakes);
+  EXAMS = Object.assign({}, EXAMS_BUILTIN, STORE.exams);
+}
+
+const byId = id => M.find(m => m.id === id);
+const inTopic = t => M.filter(m => m.topic === t);
+const isImported = m => STORE.mistakes.some(x => x.id === m.id);
+
+/* Konu monogramı — emoji yerine mono kod. Renk körlüğü güvenli, tarama hızlı. */
+const TOPIC_CODE = { pe: "PE", tool: "MCP", cc: "CC", agent: "AG", ctx: "CTX" };
+
+/* Verdict tek kroma eksenidir: "resmî kaynak ne diyor". */
+const VERDICT = {
+  ok:            { glyph: "✓", label: "Resmî dokümanla uyumlu",   short: "Uyumlu",        cls: "v-ok"   },
+  conflict:      { glyph: "⚠", label: "Kurs cevabı resmî dokümanla ÇELİŞİYOR", short: "Çelişki", cls: "v-conf" },
+  dated:         { glyph: "◑", label: "Kabaca doğru ama güncel değil", short: "Güncel değil", cls: "v-warn" },
+  authoritative: { glyph: "★", label: "Resmî doğruyu veren referans soru", short: "Doğruyu veren", cls: "v-ok" },
+  unverified:    { glyph: "◷", label: "Henüz resmî kaynakla doğrulanmadı", short: "Doğrulanmadı", cls: "v-warn" },
+};
+
+/* İçe aktarılan metin ham yapıştırmadır — kaçırılır. Built-in kayıtlar HTML içerir. */
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+function field(m, key){ return isImported(m) ? esc(m[key]) : (m[key] || ""); }
+
+/* ============================================================
+   ROUTING
+============================================================ */
+
+const view = document.getElementById("view");
+const crumbEl = document.getElementById("crumbs");
+const mainEl = document.getElementById("main");
+
+const routes = {
+  "":            renderDashboard,
+  "mistakes":    renderMistakes,
+  "topics":      renderTopics,
+  "roadmap":     renderRoadmap,
+  "resources":   renderResources,
+  "conflicts":   renderConflicts,
+  "connections": renderConnections,
+  "notes":       renderNotes,
+  "import":      renderImport,
+};
+
+function parseHash(){
+  const h = location.hash.replace(/^#\/?/, "");
+  const [base, arg] = h.split("/");
+  return { base: base || "", arg: arg ? decodeURIComponent(arg) : "" };
+}
+
+let booted = false;
+
+function router(){
+  const { base, arg } = parseHash();
+  const finder = document.getElementById("finder");
+  if (finder) finder.value = "";
+  window.scrollTo(0, 0);
+
+  if      (base === "q"     && arg) renderQuestion(arg);
+  else if (base === "topic" && arg) renderTopic(arg);
+  else if (base === "note"  && arg) renderNote(arg);
+  else if (routes[base])            routes[base]();
+  else                              renderDashboard();
+
+  buildRail();
+  closeMobileNav();
+  if (booted) mainEl.focus({ preventScroll: true });
+  booted = true;
+}
+window.addEventListener("hashchange", router);
+
+/* ============================================================
+   KABUK — rail + breadcrumb
+============================================================ */
+
+function navHTML(glyph, label, hash, count, active){
+  return `<a class="nav" href="#/${hash}"${active ? ' aria-current="page"' : ""}>
+    <span class="glyph" aria-hidden="true">${glyph}</span>
+    <span>${label}</span>
+    ${count != null ? `<span class="n">${count}</span>` : ""}
+  </a>`;
+}
+
+function buildRail(){
+  const { base, arg } = parseHash();
+  const conflicts = M.filter(m => m.verdict === "conflict").length;
+
+  const topicNav = Object.keys(TOPICS).map(k => {
+    const active = base === "topic" && arg === k;
+    return `<a class="nav" href="#/topic/${k}"${active ? ' aria-current="page"' : ""}>
+      <span class="mono-code" aria-hidden="true">${TOPIC_CODE[k]}</span>
+      <span>${TOPICS[k].short}</span>
+      <span class="n">${inTopic(k).length}</span>
+    </a>`;
+  }).join("");
+
+  document.getElementById("rail").innerHTML = `
+    <div class="mast">
+      <a href="#/" aria-label="Panele dön">
+        <span class="wordmark">CCA-F</span>
+        <h1>Study Console</h1>
+        <p>Yanlışlardan türetilmiş kişisel dosya</p>
+      </a>
+    </div>
+
+    <div class="navgroup">
+      <span class="glabel">Dosya</span>
+      ${navHTML("◆", "Panel", "", null, base === "")}
+      ${navHTML("▸", "Tüm yanlışlar", "mistakes", M.length, base === "mistakes" || base === "q")}
+      ${navHTML("⚠", "Kurs ↯ resmî çelişki", "conflicts", conflicts, base === "conflicts")}
+      ${navHTML("⇄", "Kavram bağlantıları", "connections", null, base === "connections")}
+      ${navHTML("⨁", "Test ekle", "import", STORE.mistakes.length || null, base === "import")}
+    </div>
+
+    <div class="navgroup">
+      <span class="glabel">Konular</span>
+      ${topicNav}
+    </div>
+
+    <div class="navgroup">
+      <span class="glabel">Çalışma</span>
+      ${navHTML("↳", "Yol haritası", "roadmap", null, base === "roadmap")}
+      ${navHTML("▤", "Notlar", "notes", NOTES.length, base === "notes" || base === "note")}
+      ${navHTML("❖", "Resmî kaynaklar", "resources", null, base === "resources")}
+    </div>`;
+}
+
+function setCrumbs(arr){
+  crumbEl.innerHTML = arr.map((c, i) => {
+    if (i === arr.length - 1) return `<b>${c.t}</b>`;
+    const node = c.h ? `<a href="${c.h}">${c.t}</a>` : `<span>${c.t}</span>`;
+    return `${node}<span class="sep" aria-hidden="true">/</span>`;
+  }).join("");
+}
+
+/* ============================================================
+   PARÇALAR
+============================================================ */
+
+function topicTag(k){
+  return `<span class="tcode" title="${TOPICS[k].name}">${TOPIC_CODE[k]}</span>
+    <span class="small quiet">${TOPICS[k].short}</span>`;
+}
+
+function diffStars(d){
+  const labels = ["", "kolay", "orta", "zor"];
+  return `<span class="stars" title="Zorluk: ${labels[d]}" aria-label="Zorluk: ${labels[d]}">
+    <span class="on">${"★".repeat(d)}</span>${"☆".repeat(3 - d)}</span>`;
+}
+
+function verdictChip(v, full){
+  const x = VERDICT[v]; if (!x) return "";
+  return `<span class="chip ${x.cls}"><span aria-hidden="true">${x.glyph}</span>${full ? x.label : x.short}</span>`;
+}
+
+function rowHTML(m){
+  const c = field(m, "correct");
+  const short = c.length > 130 ? c.slice(0, 128) + "…" : c;
+  return `<a class="row" href="#/q/${m.id}">
+    <div class="rtop">
+      <span class="rid">E${m.exam}·Q${m.q}</span>
+      ${topicTag(m.topic)}
+      ${diffStars(m.diff)}
+      ${m.verdict !== "ok" ? verdictChip(m.verdict) : ""}
+      ${isImported(m) ? `<span class="chip"><span class="dot"></span>İçe aktarıldı</span>` : ""}
+    </div>
+    <div class="rq">${field(m, "scenario")}</div>
+    <div class="ra"><span class="k">Doğrusu:</span> ${short}</div>
+  </a>`;
+}
+
+function ledger(items, emptyMsg){
+  if (!items.length) return `<p class="empty">${emptyMsg || "Kayıt yok."}</p>`;
+  return `<div class="ledger">${items.map(rowHTML).join("")}</div>`;
+}
+
+function docHTML(title, url){
+  let host = url; try { host = new URL(url).host; } catch (e) {}
+  return `<a class="doc" href="${esc(url)}" target="_blank" rel="noopener noreferrer">
+    <span class="g" aria-hidden="true">❖</span>
+    <span class="m"><span class="t">${esc(title)}</span><span class="u">${esc(host)}</span></span>
+    <span class="x" aria-hidden="true">↗</span>
+  </a>`;
+}
+
+/* ============================================================
+   PANEL
+============================================================ */
+
+function renderDashboard(){
+  setCrumbs([{ t: "Panel" }]);
+
+  const examKeys = Object.keys(EXAMS).sort((a, b) => a - b);
+  const totalQ = examKeys.reduce((a, e) => a + (EXAMS[e].total || 0), 0);
+  const totalCorrect = examKeys.reduce((a, e) => a + (EXAMS[e].correct || 0), 0);
+  const overall = totalQ ? Math.round(totalCorrect / totalQ * 100) : 0;
+  const conflicts = M.filter(m => m.verdict === "conflict").length;
+
+  const stats = Object.keys(TOPICS).map(k => ({ k, n: inTopic(k).length }))
+    .sort((a, b) => b.n - a.n);
+  const weakest = stats[0];
+  const maxN = weakest.n || 1;
+  const start = inTopic(weakest.k).find(m => m.verdict === "conflict") || inTopic(weakest.k)[0];
+
+  const weakRows = stats.map(s => `
+    <a class="row" href="#/topic/${s.k}">
+      <div class="rtop">
+        <span class="tcode">${TOPIC_CODE[s.k]}</span>
+        <b>${TOPICS[s.k].short}</b>
+        <span class="chip"><span class="dot"></span>${s.n} yanlış</span>
+      </div>
+      <div class="bar ${s.n >= 6 ? "" : "q"}" style="max-width:340px"><i style="width:${Math.round(s.n / maxN * 100)}%"></i></div>
+    </a>`).join("");
+
+  view.innerHTML = `
+    <p class="eyebrow">Bugünün dosyası</p>
+    <h2 class="briefing">En zayıf alanın <span class="quiet">${TOPICS[weakest.k].short}</span>.</h2>
+    <p class="lede">${examKeys.length} pratik sınavdan ${M.length} yanlış çıktı, hepsi konuya ve kavrama bağlandı, resmî Anthropic dokümanıyla karşılaştırıldı.
+      ${start ? `Bugün <b>E${start.exam}·Q${start.q}</b> ile başla.` : ""}</p>
+
+    <div class="btnrow" style="margin-bottom:40px">
+      ${start ? `<a class="btn pri" href="#/q/${start.id}">Buradan başla →</a>` : ""}
+      <a class="btn" href="#/mistakes">Tüm yanlışlar</a>
+      ${conflicts ? `<a class="btn" href="#/conflicts">${conflicts} çelişkiyi gör</a>` : ""}
+    </div>
+
+    <div class="strip">
+      <div><div class="n">%${overall}</div><div class="l">Genel doğruluk · ${totalCorrect}/${totalQ}</div></div>
+      <div><div class="n">${M.length}</div><div class="l">Tekrar edilecek yanlış</div></div>
+      <div><div class="n acc">${conflicts}</div><div class="l">Kurs ↯ resmî çelişki</div></div>
+      <div><div class="n">${examKeys.length}</div><div class="l">Çözülmüş pratik sınav</div></div>
+    </div>
+
+    <h3>Sınav bazında</h3>
+    <div class="grid g3">
+      ${examKeys.map(e => {
+        const ex = EXAMS[e];
+        const pct = ex.total ? Math.round(ex.correct / ex.total * 100) : 0;
+        const pass = pct >= 72;
+        return `<div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+            <h4 style="margin:0">${esc(ex.name)}</h4>
+            <span class="small quiet">${esc(ex.attempt || "")}</span>
+          </div>
+          <div class="small quiet" style="margin:6px 0 14px">${ex.correct} doğru · ${ex.wrong} yanlış · ${ex.total} soru</div>
+          <div class="bar"><i style="width:${pct}%"></i></div>
+          <div class="small quiet" style="margin-top:9px">
+            %${pct} · geçme eşiği ~%72
+            ${pass ? `<span class="chip v-ok" style="margin-left:6px"><span aria-hidden="true">✓</span>Geçer</span>`
+                   : `<span class="chip v-warn" style="margin-left:6px"><span aria-hidden="true">◑</span>Eşik altı</span>`}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+
+    <h3>Tekrarlayan tek desen</h3>
+    <div class="note acc reading">
+      <span class="mlabel"><span aria-hidden="true">◆</span>Determinizm &gt; olasılık</span>
+      <p>Yanlışlarının çoğu tek bir düşünce hatasından geliyor: bir davranışı prompt ile <i>rica etmek</i> ile
+        sistem düzeyinde <b>garanti etmek</b> arasındaki farkı kaçırıyorsun. "Dikkatli ol" demek, few-shot örnek
+        eklemek, CoT: hepsi olasılıksal. Doğru cevap neredeyse her zaman deterministik olan:
+        <code>tool_choice</code> ile şema zorlama, programatik gate, multi-agent consensus, kaynağında temiz veri.</p>
+      <p style="margin-bottom:0"><a class="pill" href="#/connections">Kavram bağlantılarını gör →</a></p>
+    </div>
+
+    <h3>Nereye çalışmalısın</h3>
+    <p class="small quiet reading" style="margin-bottom:20px">Yanlış yoğunluğuna göre sıralı. Üstteki alan en çok tekrar isteyendir.</p>
+    <div class="ledger">${weakRows}</div>`;
+}
+
+/* ============================================================
+   KONULAR
+============================================================ */
+
+function renderTopics(){
+  setCrumbs([{ t: "Konular" }]);
+  view.innerHTML = `
+    <p class="eyebrow">Konular</p>
+    <h2 class="title">Beş alan, yanlış yoğunluğuna göre</h2>
+    <p class="lede">Her alan, o alandaki yanlışların, resmî açıklamalar ve "aklında kalsın" özetiyle birlikte.</p>
+    <div class="ledger">
+      ${Object.keys(TOPICS).sort((a, b) => inTopic(b).length - inTopic(a).length).map(k => {
+        const items = inTopic(k);
+        return `<a class="row" href="#/topic/${k}">
+          <div class="rtop">
+            <span class="tcode">${TOPIC_CODE[k]}</span>
+            <b>${TOPICS[k].short}</b>
+            <span class="chip"><span class="dot"></span>${items.length} yanlış</span>
+          </div>
+          <div class="ra">${TOPICS[k].name}</div>
+        </a>`;
+      }).join("")}
+    </div>`;
+}
+
+const TOPIC_REMEMBER = {
+  tool: `<div class="remember">
+    <span class="mlabel">MCP primitifleri — üçlüyü karıştırma</span>
+    <div class="flow">
+      <span class="node">Tools = EYLEM</span><span class="arrow" aria-hidden="true">·</span>
+      <span class="node">Resources = VERİ</span><span class="arrow" aria-hidden="true">·</span>
+      <span class="node">Prompts = ŞABLON</span>
+    </div>
+    <p class="small quiet" style="margin:16px 0 0">Tools çalıştırılır (iki yönlü), Resources okunur (salt-okunur bağlam / canlı log),
+      Prompts hazır talimat şablonudur. Ayrıca: <b>işi sunucuda yap, modele temiz + minimal veri döndür.</b></p></div>`,
+
+  pe: `<div class="remember">
+    <span class="mlabel">Tool sonucu hangi rolle döner?</span>
+    <div class="flow">
+      <span class="node">assistant: tool_use</span><span class="arrow" aria-hidden="true">→</span>
+      <span class="node">role: user</span><span class="arrow" aria-hidden="true">→</span>
+      <span class="node">content: tool_result</span>
+    </div>
+    <p class="small quiet" style="margin:16px 0 0">Ayrı bir <code>tool</code> rolü YOK. Garanti gereken çıktı için prompt değil
+      <code>tool_choice</code> + şema (gerekirse <code>strict: true</code>).</p></div>`,
+
+  cc: `<div class="remember">
+    <span class="mlabel">.env'i korumanın gerçek yolu</span>
+    <div class="flow vert">
+      <span class="node">env değişkenine taşı</span><span class="arrow" aria-hidden="true">↓</span>
+      <span class="node">settings.json → permissions.deny: Read(.env)</span><span class="arrow" aria-hidden="true">↓</span>
+      <span class="node">Plan Mode (salt-okunur)</span>
+    </div>
+    <p class="small quiet" style="margin:16px 0 0"><b>.claudeignore diye bir dosya yok.</b> Hiyerarşi: Deny → Ask → Allow (deny kazanır).</p></div>`,
+
+  agent: `<div class="remember">
+    <span class="mlabel">Güvenilirlik mimariden gelir</span>
+    <div class="flow">
+      <span class="node no">prompt / few-shot = olasılık</span><span class="arrow" aria-hidden="true">→</span>
+      <span class="node yes">gate / consensus / paralel tool = garanti</span>
+    </div>
+    <p class="small quiet" style="margin:16px 0 0">Sıra kritikse programatik gate; yanlış-pozitif kritikse multi-agent consensus;
+      hız gerekiyorsa tek turda paralel tool_use.</p></div>`,
+
+  ctx: `<div class="remember">
+    <span class="mlabel">Prompt caching kuralları</span>
+    <div class="flow">
+      <span class="node">cache_control = statik içeriğin SONUNA</span><span class="arrow" aria-hidden="true">·</span>
+      <span class="node">maks 4 breakpoint</span>
+    </div>
+    <p class="small quiet" style="margin:16px 0 12px">Breakpoint kendinden öncekini cache'ler. Uzun iş akışında kalıcı bilgiyi
+      (style guide) her isteğe ekle.</p>
+    <a class="pill" href="#/note/prompt-caching">Cache püf noktaları notunu aç →</a></div>`,
+};
+
+function renderTopic(k){
+  const t = TOPICS[k];
+  if (!t) return renderTopics();
+  const items = inTopic(k);
+  const remember = TOPIC_REMEMBER[k] || "";
+  const avg = items.length ? Math.round(items.reduce((a, m) => a + m.diff, 0) / items.length) : 0;
+  const conf = items.filter(m => m.verdict === "conflict").length;
+
+  setCrumbs([{ t: "Konular", h: "#/topics" }, { t: t.short }]);
+
+  view.innerHTML = `
+    <div class="with-toc">
+      <div>
+        <a class="back" href="#/topics"><span aria-hidden="true">←</span>Konular</a>
+        <p class="eyebrow">${TOPIC_CODE[k]} · ${t.name}</p>
+        <h2 class="title">${t.short}</h2>
+        <div class="meta" style="margin-bottom:8px">
+          <span class="chip"><span class="dot"></span>${items.length} yanlış</span>
+          <span class="chip">Ortalama zorluk: ${["", "kolay", "orta", "zor"][avg] || "—"}</span>
+          ${conf ? `<span class="chip v-conf"><span aria-hidden="true">⚠</span>${conf} çelişki</span>` : ""}
+        </div>
+
+        <h3 id="genel">Genel bakış</h3>
+        <p class="reading">${t.blurb}</p>
+
+        <h3 id="yanlislar">Bu alandaki yanlışların</h3>
+        <p class="small quiet reading" style="margin-bottom:20px">Her satır bir soru. Aç: senin cevabın, doğrusu,
+          neden kaçırdığın ve resmî kaynak.</p>
+        ${ledger(items, "Bu alanda yanlışın yok.")}
+
+        ${remember ? `<h3 id="akilda">Aklında kalsın</h3><div class="reading">${remember}</div>` : ""}
+      </div>
+      <aside class="toc" aria-label="Sayfa içeriği">
+        <span class="mlabel">Bu sayfada</span>
+        <a href="#genel">Genel bakış</a>
+        <a href="#yanlislar">Yanlışların (${items.length})</a>
+        ${remember ? `<a href="#akilda">Aklında kalsın</a>` : ""}
+      </aside>
+    </div>`;
+}
+
+/* ============================================================
+   TÜM YANLIŞLAR
+============================================================ */
+
+let mFilter = "all";
+
+function renderMistakes(){
+  setCrumbs([{ t: "Tüm yanlışlar" }]);
+  const filters = [["all", "Tümü", M.length]]
+    .concat(Object.keys(TOPICS).map(k => [k, TOPICS[k].short, inTopic(k).length]));
+  const list = mFilter === "all" ? M : inTopic(mFilter);
+
+  view.innerHTML = `
+    <p class="eyebrow">Dosya</p>
+    <h2 class="title">Tüm yanlışlar</h2>
+    <p class="lede">${M.length} soru. Filtrele, aç, oku. Çelişki ve doğrulanmamış kayıtlar rozetle işaretli.</p>
+    <div class="filters" role="group" aria-label="Konuya göre filtrele">
+      ${filters.map(([k, l, n]) => `<button class="fbtn" aria-pressed="${mFilter === k}"
+        onclick="setFilter('${k}')">${l}<span class="n">${n}</span></button>`).join("")}
+    </div>
+    ${ledger(list, "Bu filtrede kayıt yok.")}`;
+}
+function setFilter(k){ mFilter = k; renderMistakes(); }
+
+/* ============================================================
+   SORU DETAYI
+============================================================ */
+
+function renderQuestion(id){
+  const m = byId(id);
+  if (!m) return renderMistakes();
+  const rel = (m.related || []).map(byId).filter(Boolean);
+  const v = VERDICT[m.verdict] || VERDICT.ok;
+  const idx = M.indexOf(m), prev = M[idx - 1], next = M[idx + 1];
+
+  setCrumbs([{ t: "Tüm yanlışlar", h: "#/mistakes" }, { t: `E${m.exam}·Q${m.q}` }]);
+
+  view.innerHTML = `
+    <div class="with-toc">
+      <div>
+        <a class="back" href="#/mistakes"><span aria-hidden="true">←</span>Tüm yanlışlar</a>
+        <div class="meta" style="margin-bottom:16px">
+          <span class="rid" style="font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--ink-2)">EXAM ${m.exam} · SORU ${m.q}</span>
+          ${topicTag(m.topic)}
+          ${diffStars(m.diff)}
+        </div>
+        <h2 class="title" id="soru" style="font-size:1.55rem;max-width:var(--measure);font-weight:700">${field(m, "scenario")}</h2>
+        <div style="margin:0 0 32px">${verdictChip(m.verdict, true)}</div>
+
+        <div class="reading">
+          <div class="ans-wrong">
+            <span class="mlabel"><span aria-hidden="true">✕</span>Senin cevabın</span>
+            <div class="body">${field(m, "your")}</div>
+          </div>
+          <div class="ans-right">
+            <span class="mlabel"><span aria-hidden="true">✓</span>Doğru cevap</span>
+            <div class="body">${field(m, "correct")}</div>
+          </div>
+        </div>
+
+        <h3 id="neden">Neden kaçırdın</h3>
+        <div class="reading">${field(m, "why")}</div>
+
+        <h3 id="resmi">Resmî açıklama</h3>
+        <div class="note ${m.verdict === "conflict" ? "warn" : "acc"} reading">
+          <span class="mlabel"><span aria-hidden="true">${m.verdict === "conflict" ? "⚠" : "❖"}</span>${
+            m.verdict === "conflict" ? "Dikkat — kurs cevabı ≠ resmî doküman" : "Resmî dokümana göre"}</span>
+          <p style="margin-bottom:0">${field(m, "official")}</p>
+        </div>
+
+        ${(m.docs || []).length ? `<h3 id="kaynak">Resmî kaynaklar</h3>
+          <div class="reading">${m.docs.map(d => docHTML(d[0], d[1])).join("")}</div>` : ""}
+
+        ${rel.length ? `<h3 id="ilgili">Aynı şeyi test eden sorular</h3>
+          <p class="small quiet reading" style="margin-bottom:16px">Bu kavram şu sorularda da çıkıyor. Birini yanlışladıysan
+            diğerlerini de tekrar et.</p>
+          <div class="pills">${rel.map(r => `<a class="pill" href="#/q/${r.id}">
+            <span class="tcode">${TOPIC_CODE[r.topic]}</span>E${r.exam}·Q${r.q}</a>`).join("")}</div>` : ""}
+
+        ${(m.concepts || []).length ? `<hr class="rule" />
+          <h4>İlişkili kavramlar</h4>
+          <div class="pills">${m.concepts.map(c => `<a class="pill" href="#/connections">${CONCEPTS[c] || c}</a>`).join("")}</div>` : ""}
+
+        <div class="btnrow" style="margin-top:44px;justify-content:space-between">
+          ${prev ? `<a class="btn" href="#/q/${prev.id}"><span aria-hidden="true">←</span>E${prev.exam}·Q${prev.q}</a>` : "<span></span>"}
+          ${next ? `<a class="btn" href="#/q/${next.id}">E${next.exam}·Q${next.q}<span aria-hidden="true">→</span></a>` : "<span></span>"}
+        </div>
+      </div>
+      <aside class="toc" aria-label="Sayfa içeriği">
+        <span class="mlabel">Bu soruda</span>
+        <a href="#soru">Soru</a>
+        <a href="#neden">Neden kaçırdın</a>
+        <a href="#resmi">Resmî açıklama</a>
+        ${(m.docs || []).length ? `<a href="#kaynak">Kaynaklar</a>` : ""}
+        ${rel.length ? `<a href="#ilgili">İlgili sorular</a>` : ""}
+      </aside>
+    </div>`;
+}
+
+/* ============================================================
+   ÇELİŞKİLER
+============================================================ */
+
+function renderConflicts(){
+  setCrumbs([{ t: "Kurs ↯ resmî çelişki" }]);
+  const conflicts = M.filter(m => m.verdict === "conflict");
+  const dated = M.filter(m => m.verdict === "dated");
+  const auth = M.filter(m => m.verdict === "authoritative");
+
+  view.innerHTML = `
+    <p class="eyebrow">Kaynak doğruluğu</p>
+    <h2 class="title">Kurs cevabı ↯ resmî doküman</h2>
+    <p class="lede">Kursun her "doğru" cevabı resmî Anthropic dokümanıyla karşılaştırıldı. Aşağıdakiler ayrıştığı yerler.
+      Sınavda kursun dediğini işaretle, ama <b>gerçekte doğrusunu bil.</b></p>
+
+    <div class="note warn reading">
+      <span class="mlabel"><span aria-hidden="true">⚠</span>En önemli çelişki: hayali <code>.claudeignore</code> dosyası</span>
+      <p>Exam 2, Q22 ve Q27 dosya erişimini <code>.claudeignore</code> ile kısıtlamayı doğru sayıyor.
+        <b>Resmî Anthropic dokümanında böyle bir dosya yok.</b> Claude Code dosya erişimini
+        <code>.claude/settings.json</code> içindeki <code>permissions.deny</code> ile kısıtlar; <b>Exam 1 Q15 bunu doğru veriyor.</b> İki test kendi içinde çelişiyor; doğrusu Q15.</p>
+      <div class="flow vert" style="margin-top:16px">
+        <span class="node no">.claudeignore → temp/ *.log</span>
+        <span class="arrow" aria-hidden="true">↓</span>
+        <span class="node yes">.claude/settings.json → permissions.deny: Read(./.env)</span>
+      </div>
+    </div>
+
+    <h3>Doğrudan çelişkiler <span class="quiet">(${conflicts.length})</span></h3>
+    ${ledger(conflicts, "Doğrudan çelişki yok.")}
+
+    <h3>Kabaca doğru ama güncel değil <span class="quiet">(${dated.length})</span></h3>
+    <p class="small quiet reading" style="margin-bottom:20px">Kursun cevabı büyük yanlış değil ama güncel Anthropic pratiğini yansıtmıyor.</p>
+    ${ledger(dated, "Güncelliğini yitirmiş kayıt yok.")}
+
+    <h3>Doğruyu veren referans soru <span class="quiet">(${auth.length})</span></h3>
+    <p class="small quiet reading" style="margin-bottom:20px">Yukarıdaki çelişkinin resmî doğru cevabını içeren soru.</p>
+    ${ledger(auth, "Referans soru yok.")}`;
+}
+
+/* ============================================================
+   KAVRAM BAĞLANTILARI
+============================================================ */
+
+function renderConnections(){
+  setCrumbs([{ t: "Kavram bağlantıları" }]);
+  const groups = Object.entries(CONCEPTS)
+    .map(([c, label]) => ({ c, label, items: M.filter(m => (m.concepts || []).includes(c)) }))
+    .filter(g => g.items.length)
+    .sort((a, b) => b.items.length - a.items.length);
+
+  view.innerHTML = `
+    <p class="eyebrow">Bilgi grafiği</p>
+    <h2 class="title">Kavram bağlantıları</h2>
+    <p class="lede">Aynı temel kavramı test eden sorular birbirine bağlı. Bir kavramda hata yaptıysan o kümenin tamamını
+      tekrar et — sınav aynı fikri farklı senaryolarla soruyor.</p>
+
+    <div class="note acc reading">
+      <span class="mlabel"><span aria-hidden="true">◆</span>Baskın kavram: determinizm &gt; olasılık</span>
+      <p style="margin-bottom:0">Yanlışlarının en büyük kümesi bu. Prompt ile <i>rica</i> etmek (few-shot, "dikkatli ol", CoT)
+        olasılıksaldır; <code>tool_choice</code> şema zorlama, programatik gate, multi-agent consensus <b>deterministiktir</b>.
+        Sınavda "en güvenilir / en etkili / garanti" kelimelerini görürsen: cevap neredeyse her zaman deterministik seçenektir.</p>
+    </div>
+
+    ${groups.map(g => `
+      <h3>${g.label} <span class="quiet">(${g.items.length})</span></h3>
+      <div class="pills">${g.items.map(m => `<a class="pill" href="#/q/${m.id}">
+        <span class="tcode">${TOPIC_CODE[m.topic]}</span>E${m.exam}·Q${m.q}</a>`).join("")}</div>`).join("")}`;
+}
+
+/* ============================================================
+   NOTLAR
+============================================================ */
+
+function renderNotes(){
+  setCrumbs([{ t: "Notlar" }]);
+  view.innerHTML = `
+    <p class="eyebrow">Notlar</p>
+    <h2 class="title">Çalışma notları</h2>
+    <p class="lede">Dokümantasyondan derlediğin püf noktaları. Yanlışlarından bağımsız, doğrudan çalışmak istediğin konular.</p>
+    <div class="ledger">
+      ${NOTES.map(n => `<a class="row" href="#/note/${n.id}">
+        <div class="rtop">
+          <span class="tcode">${TOPIC_CODE[n.topic]}</span>
+          <b>${n.title}</b>
+          <span class="chip"><span class="dot"></span>${n.sections.length} bölüm</span>
+        </div>
+        <div class="ra">${n.summary}</div>
+      </a>`).join("")}
+    </div>`;
+}
+
+function renderNote(id){
+  const n = NOTES.find(x => x.id === id);
+  if (!n) return renderNotes();
+  const rel = M.filter(m => m.topic === n.topic || (m.concepts || []).includes("caching"));
+
+  setCrumbs([{ t: "Notlar", h: "#/notes" }, { t: n.title }]);
+
+  view.innerHTML = `
+    <div class="with-toc">
+      <div>
+        <a class="back" href="#/notes"><span aria-hidden="true">←</span>Notlar</a>
+        <p class="eyebrow">${TOPIC_CODE[n.topic]} · ${TOPICS[n.topic].name}</p>
+        <h2 class="title">${n.title}</h2>
+        <p class="lede">${n.summary}</p>
+
+        ${n.sections.map(s => `<h3 id="${s.id}">${s.h}</h3><div class="reading">${s.html}</div>`).join("")}
+
+        <h3 id="kaynak">Resmî kaynak</h3>
+        <div class="reading">${docHTML(n.source[0], n.source[1])}</div>
+
+        ${rel.length ? `<h3 id="ilgili">Bu notla ilgili yanlışların</h3>
+          <p class="small quiet reading" style="margin-bottom:16px">Aynı konuyu test eden sorular. Notu okuduktan sonra bunları tekrar et.</p>
+          <div class="pills">${rel.map(r => `<a class="pill" href="#/q/${r.id}">
+            <span class="tcode">${TOPIC_CODE[r.topic]}</span>E${r.exam}·Q${r.q}</a>`).join("")}</div>` : ""}
+      </div>
+      <aside class="toc" aria-label="Sayfa içeriği">
+        <span class="mlabel">Bu notta</span>
+        ${n.sections.map(s => `<a href="#${s.id}">${s.h}</a>`).join("")}
+        <a href="#kaynak">Resmî kaynak</a>
+        ${rel.length ? `<a href="#ilgili">İlgili yanlışlar</a>` : ""}
+      </aside>
+    </div>`;
+}
+
+/* ============================================================
+   YOL HARİTASI
+============================================================ */
+
+function renderRoadmap(){
+  setCrumbs([{ t: "Yol haritası" }]);
+  const steps = [
+    ["done", "Prompt Basics & Messages API", "Rol yapısı (user/assistant), content blokları, XML üretimi. Temel sağlam.", null],
+    ["now",  "Yapılandırılmış çıktı & tool use", "tool_choice tipleri, tool_result rolü, strict şema. En çok yanlışın burada, <b>öncelik 1</b>.", "pe"],
+    ["now",  "Tool design & MCP", "Tools / Resources / Prompts ayrımı + sunucu-tarafı veri işleme. <b>Öncelik 2</b>.", "tool"],
+    ["",     "Extended / adaptive thinking", "<code>thinking: { type: enabled, budget_tokens }</code> ve yeni adaptive + effort modeli.", "pe"],
+    ["",     "Context & prompt caching", "cache_control yerleşimi, maks 4 breakpoint, kalıcı style guide.", "ctx"],
+    ["",     "Claude Code config & güvenlik", "settings.json permissions.deny, Plan Mode, headless -p. <b>.claudeignore YOK.</b>", "cc"],
+    ["",     "Agentic orkestrasyon", "Programatik gate, multi-agent consensus, paralel tool use.", "agent"],
+    ["",     "Değerlendirme & tekrar", "Tüm yanlışları tekrar çöz; aynı kavramı test eden soruları grupla.", null],
+    ["",     "Pratik sınav (yeniden)", "Exam 1–3'ü tekrar. Hedef: çelişki tuzaklarında kursun dediğini işaretle ama doğrusunu bil.", null],
+  ];
+
+  view.innerHTML = `
+    <p class="eyebrow">Öğrenme yolu</p>
+    <h2 class="title">Çalışma sırası</h2>
+    <p class="lede">Yanlış yoğunluğuna göre sıralanmış. "Şimdi" işaretli adımlar en çok yanlış yaptığın alanlar; oradan başla.</p>
+    <div class="road">
+      ${steps.map((s, i) => `<div class="step ${s[0]}">
+        <div class="dot" aria-hidden="true">${s[0] === "done" ? "✓" : i + 1}</div>
+        <div class="sh">
+          <h4>${s[1]}</h4>
+          ${s[0] === "now" ? `<span class="chip v-conf"><span aria-hidden="true">▸</span>Şimdi</span>`
+            : s[0] === "done" ? `<span class="chip v-ok"><span aria-hidden="true">✓</span>Tamam</span>` : ""}
+        </div>
+        <p>${s[2]}</p>
+        ${s[3] ? `<a class="pill" href="#/topic/${s[3]}"><span class="tcode">${TOPIC_CODE[s[3]]}</span>${TOPICS[s[3]].short} →</a>` : ""}
+      </div>`).join("")}
+    </div>`;
+}
+
+/* ============================================================
+   RESMÎ KAYNAKLAR
+============================================================ */
+
+function renderResources(){
+  setCrumbs([{ t: "Resmî kaynaklar" }]);
+  const all = [];
+  M.forEach(m => (m.docs || []).forEach(d => { if (!all.find(x => x[1] === d[1])) all.push(d); }));
+
+  const buckets = {
+    "Messages API & tool use":       all.filter(d => /tool-use|structured|pdf|building-effective/.test(d[1])),
+    "Prompt engineering & thinking": all.filter(d => /prompt-engineering|extended-thinking|thinking-steering|multishot|use-xml/.test(d[1])),
+    "Context & caching":             all.filter(d => /prompt-caching/.test(d[1])),
+    "Model Context Protocol":        all.filter(d => /modelcontextprotocol/.test(d[1])),
+    "Claude Code":                   all.filter(d => /code\.claude\.com/.test(d[1])),
+  };
+  const bucketed = new Set(Object.values(buckets).flat().map(d => d[1]));
+  const rest = all.filter(d => !bucketed.has(d[1]));
+  if (rest.length) buckets["Diğer"] = rest;
+
+  view.innerHTML = `
+    <p class="eyebrow">Kaynaklar</p>
+    <h2 class="title">Resmî kaynaklar</h2>
+    <p class="lede">Yalnızca Anthropic resmî alan adları: <code>docs.anthropic.com</code>, <code>platform.claude.com</code>,
+      <code>code.claude.com</code>, <code>modelcontextprotocol.io</code>, <code>anthropic.com</code>.
+      Dosyadaki her açıklama bunlardan doğrulandı.</p>
+    ${Object.entries(buckets).map(([name, ds]) => ds.length
+      ? `<h3>${name} <span class="quiet">(${ds.length})</span></h3>
+         <div class="reading">${ds.map(d => docHTML(d[0], d[1])).join("")}</div>` : "").join("")}
+    <div class="note acc reading" style="margin-top:44px">
+      <span class="mlabel"><span aria-hidden="true">◆</span>Çalışma disiplini</span>
+      <p style="margin-bottom:0">Bir soruyu tekrar ederken önce kendi cevabını hatırla, sonra resmî kaynağı aç ve <b>neden</b>
+        öyle olduğunu oku. Kursun açıklamasını değil, dokümanın kendi ifadesini ezberle — çelişki tuzakları tam da bu yüzden var.</p>
+    </div>`;
+}
+
+/* ============================================================
+   İÇE AKTARMA
+============================================================ */
+
+let parsed = null;
+
+function mapDomain(s){
+  s = (s || "").toLowerCase();
+  if (s.includes("prompt engineering")) return "pe";
+  if (s.includes("tool design") || s.includes("mcp")) return "tool";
+  if (s.includes("claude code")) return "cc";
+  if (s.includes("agentic")) return "agent";
+  if (s.includes("context")) return "ctx";
+  return "pe";
+}
+
+function parseUdemy(text){
+  const lines = text.split("\n").map(l => l.trim()).filter(l => l.length);
+  const exNum   = (text.match(/Practice Exam\s+(\d+)/i) || [])[1] || "";
+  const attempt = (text.match(/Deneme\s+\d+/i) || [])[0] || "";
+  const total   = (text.match(/(\d+)\s*tümü/) || [])[1];
+  const correct = (text.match(/(\d+)\s*doğru/) || [])[1];
+  const wrong   = (text.match(/(\d+)\s*yanlış/) || [])[1];
+  const nameM   = text.match(/(Practice Exam[^\n]*?)\s*-\s*Sonuçlar/i);
+
+  const CORR  = ["Doğru cevap", "Doğru seçim"];
+  const WRONG = ["Cevabınız yanlış", "Seçiminiz yanlış"];
+  const MARK  = ["Doğru cevap", "Doğru seçim", "Cevabınız yanlış", "Seçiminiz yanlış", "Seçiminiz doğru"];
+
+  const hdr = [];
+  lines.forEach((l, i) => { if (/^Soru\s+\d+$/.test(l)) hdr.push(i); });
+
+  const mistakes = [];
+  hdr.forEach((start, hi) => {
+    const end = (hi + 1 < hdr.length) ? hdr[hi + 1] : lines.length;
+    let B = lines.slice(start, end);
+    const fi = B.findIndex(l => /Sonuçlara genel bakış|En üste geri dön|Kurs içeriği/.test(l));
+    if (fi > 0) B = B.slice(0, fi);
+    if (!B.some(l => WRONG.includes(l))) return; // yalnızca yanlışlar
+
+    const qNum = (B[0].match(/^Soru\s+(\d+)$/) || [])[1];
+    const dai = B.findIndex(l => l.includes("Bunu daha detaylı açıkla"));
+    const sStart = dai >= 0 ? dai + 1 : 2;
+    let sEnd = B.findIndex((l, idx) => idx >= sStart && MARK.includes(l));
+    if (sEnd < 0) sEnd = sStart + 1;
+    const scenario = B.slice(sStart, sEnd).join(" ");
+
+    const correctParts = [], yourParts = [];
+    let whyText = "";
+    B.forEach((l, idx) => {
+      if (CORR.includes(l) && B[idx + 1]) correctParts.push(B[idx + 1]);
+      if (WRONG.includes(l) && B[idx + 1]) {
+        yourParts.push(B[idx + 1]);
+        if (!whyText && B[idx + 2] === "Açıklama" && B[idx + 3]) whyText = B[idx + 3];
+      }
+    });
+
+    const gi = B.findIndex(l => l.includes("Genel açıklama"));
+    const ei = B.findIndex(l => l.includes("Etki alanı"));
+    let official = "", docs = [];
+    if (gi >= 0) official = B.slice(gi + 1, ei > gi ? ei : B.length).join(" ");
+    const ref = (official.match(/(?:Ref|Reference)\.?:\s*(https?:\/\/\S+)/i) || [])[1];
+    official = official.replace(/(?:Ref|Reference)\.?:\s*https?:\/\/\S+/i, "").trim();
+    if (ref) docs.push(["Kursun verdiği kaynak", ref]);
+    const domain = (ei >= 0 && B[ei + 1]) ? B[ei + 1] : "";
+
+    mistakes.push({
+      id: "u" + exNum + "q" + qNum, exam: +exNum, q: +qNum,
+      topic: mapDomain(domain), diff: 2,
+      concepts: [], related: [], verdict: "unverified", docs,
+      scenario: scenario || "(senaryo ayrıştırılamadı)",
+      your: yourParts.join("  ·  ") || "—",
+      correct: correctParts.join("  ·  ") || "—",
+      why: whyText || "İçe aktarıldı. Resmî doğrulama ve koçluk için aşağıdaki kopyala düğmesini kullan.",
+      official: official || "Kurs genel açıklaması bulunamadı.",
+    });
+  });
+
+  const exam = {
+    num: +exNum,
+    name: nameM ? nameM[1].trim() : ("Practice Exam " + exNum),
+    attempt, total: +total || 0, correct: +correct || 0, wrong: +wrong || mistakes.length,
+  };
+  return { exam, mistakes };
+}
+
+function parseAndPreview(){
+  const box = document.getElementById("pasteBox");
+  const out = document.getElementById("previewArea");
+  const txt = ((box && box.value) || "").trim();
+
+  if (!txt) {
+    out.innerHTML = `<div class="note warn"><span class="mlabel"><span aria-hidden="true">⚠</span>Boş</span>
+      <p style="margin-bottom:0">Önce Udemy sonuç sayfasının metnini yapıştır.</p></div>`;
+    return;
+  }
+
+  parsed = parseUdemy(txt);
+
+  if (!parsed.mistakes.length) {
+    out.innerHTML = `<div class="note warn"><span class="mlabel"><span aria-hidden="true">⚠</span>Yanlış bulunamadı</span>
+      <p style="margin-bottom:0">Metinde "Soru N / Cevabınız yanlış" bloğu yok. Sonuç sayfasında <b>"yanlış" filtresine</b>
+      tıklayıp tüm sayfa metnini (Ctrl+A, Ctrl+C) yapıştırdığından emin ol.</p></div>`;
+    return;
+  }
+
+  const ex = parsed.exam;
+  out.innerHTML = `
+    <div class="note ok">
+      <span class="mlabel"><span aria-hidden="true">✓</span>${parsed.mistakes.length} yanlış ayrıştırıldı</span>
+      <p style="margin-bottom:0"><b>${esc(ex.name)}</b> ${esc(ex.attempt)} · ${ex.total} soru · ${ex.correct} doğru · ${ex.wrong} yanlış</p>
+    </div>
+    <div class="ledger">
+      ${parsed.mistakes.map(m => `<div class="row">
+        <div class="rtop">
+          <span class="rid">E${m.exam}·Q${m.q}</span>
+          <span class="tcode">${TOPIC_CODE[m.topic]}</span>
+          <span class="chip v-warn"><span aria-hidden="true">◷</span>Doğrulanmadı</span>
+        </div>
+        <div class="rq">${esc(m.scenario)}</div>
+        <div class="ra"><span class="quiet">Senin:</span> ${esc(m.your)} &nbsp;·&nbsp; <span class="k">Doğrusu:</span> ${esc(m.correct)}</div>
+      </div>`).join("")}
+    </div>
+    <div class="btnrow" style="margin-top:18px">
+      <button class="btn pri" onclick="commitImport()">${parsed.mistakes.length} yanlışı kaydet</button>
+      <button class="btn" onclick="cancelImport()">Vazgeç</button>
+    </div>`;
+}
+
+function cancelImport(){ parsed = null; document.getElementById("previewArea").innerHTML = ""; }
+
+function commitImport(){
+  if (!parsed) return;
+  const ids = new Set(parsed.mistakes.map(m => m.id));
+  STORE.mistakes = STORE.mistakes.filter(m => !ids.has(m.id)).concat(parsed.mistakes);
+  if (parsed.exam && parsed.exam.num) {
+    STORE.exams[parsed.exam.num] = {
+      name: parsed.exam.name, attempt: parsed.exam.attempt,
+      total: parsed.exam.total, correct: parsed.exam.correct, wrong: parsed.exam.wrong,
+    };
+  }
+  persist(); rebuild(); parsed = null;
+  renderImport(); buildRail();
+}
+
+function deleteImportedExam(num){
+  STORE.mistakes = STORE.mistakes.filter(m => String(m.exam) !== String(num));
+  delete STORE.exams[num];
+  persist(); rebuild(); renderImport(); buildRail();
+}
+
+function clearAllImported(){
+  STORE = { mistakes: [], exams: {} };
+  persist(); rebuild(); renderImport(); buildRail();
+}
+
+function copyForClaude(){
+  const items = STORE.mistakes;
+  if (!items.length) return;
+  const txt = "Şu içe-aktarılmış CCA-F yanlışlarını zenginleştir: her biri için Türkçe \"neden kaçırdın\" koçluğu, "
+    + "resmî Anthropic dokümanıyla doğrulama (verdict), ilgili sorular ve kavram etiketleri ekle.\n\n"
+    + items.map(m => `[${m.id}] Exam ${m.exam} · Q${m.q} · ${TOPICS[m.topic].short}
+Soru: ${m.scenario}
+Senin cevabın: ${m.your}
+Kurs doğrusu: ${m.correct}`).join("\n\n");
+
+  navigator.clipboard.writeText(txt).then(() => {
+    const b = document.getElementById("copyBtn");
+    if (b) { b.textContent = "✓ Panoya kopyalandı"; setTimeout(() => { b.textContent = "Claude'a göndermek için kopyala"; }, 2500); }
+  });
+}
+
+function renderImport(){
+  setCrumbs([{ t: "Test ekle" }]);
+  const impExams = Object.keys(STORE.exams).sort((a, b) => a - b);
+
+  view.innerHTML = `
+    <p class="eyebrow">İçe aktarma</p>
+    <h2 class="title">Test ekle</h2>
+    <p class="lede">Yeni çözdüğün bir testi kendin ekleyebilirsin — kod veya CLI gerekmez.</p>
+
+    <div class="grid g2" style="margin-bottom:44px">
+      <div class="card">
+        <span class="mlabel" style="margin-bottom:10px">1 · Kendin ekle · anında</span>
+        <p class="small quiet" style="margin-bottom:0">Udemy sonuç sayfasını aç → <b>"yanlış" filtresine</b> tıkla →
+          sayfada Ctrl+A, Ctrl+C → aşağıya yapıştır → ayrıştır. Yanlışlar otomatik çıkarılır ve bu tarayıcıda saklanır,
+          <b>doğrulanmadı</b> rozetiyle.</p>
+      </div>
+      <div class="card">
+        <span class="mlabel" style="margin-bottom:10px">2 · Doğrulanmış hâle getir</span>
+        <p class="small quiet" style="margin-bottom:0">İçe aktardıklarını kopyala düğmesiyle al, bir sohbete ver.
+          Resmî dokümanlarla doğrulanıp "neden kaçırdın" koçluğu, çelişki tespiti ve kavram bağlantısı eklenerek
+          bu dosyaya kalıcı olarak işlenir.</p>
+      </div>
+    </div>
+
+    <h3>Udemy metnini yapıştır</h3>
+    <label for="pasteBox" class="skip">Udemy sonuç metni</label>
+    <textarea id="pasteBox" class="paste" placeholder="Udemy sonuç sayfasının tüm metnini buraya yapıştır…"></textarea>
+
+    <div class="btnrow" style="margin:14px 0 24px">
+      <button class="btn pri" onclick="parseAndPreview()">Ayrıştır ve önizle</button>
+      <button class="btn" id="copyBtn" onclick="copyForClaude()">Claude'a göndermek için kopyala</button>
+    </div>
+
+    <div id="previewArea"></div>
+
+    ${impExams.length ? `
+      <hr class="rule" />
+      <h3>İçe aktardığın testler</h3>
+      <p class="small quiet reading" style="margin-bottom:20px">Bunlar yalnızca bu tarayıcıda saklanır.</p>
+      <div class="ledger">
+        ${impExams.map(n => {
+          const ex = STORE.exams[n];
+          const cnt = STORE.mistakes.filter(m => String(m.exam) === String(n)).length;
+          return `<div class="row">
+            <div class="rtop">
+              <span class="rid">EXAM ${esc(n)}</span>
+              <b>${esc(ex.name)}</b>
+              <span class="chip v-warn"><span aria-hidden="true">◷</span>${cnt} yanlış · doğrulanmadı</span>
+            </div>
+            <div class="pills" style="margin-top:8px">
+              <a class="pill" href="#/mistakes">Listede gör</a>
+              <button class="pill" onclick="deleteImportedExam('${esc(n)}')">Sil</button>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="btnrow" style="margin-top:18px">
+        <button class="btn" onclick="clearAllImported()">Tüm içe-aktarımı temizle</button>
+      </div>`
+    : `<div class="note acc" style="margin-top:28px">
+        <span class="mlabel"><span aria-hidden="true">◆</span>Henüz içe aktarılmış test yok</span>
+        <p style="margin-bottom:0">Yukarıya yapıştırıp ayrıştır.</p>
+      </div>`}`;
+}
+
+/* ============================================================
+   ARAMA
+============================================================ */
+
+const finderEl = document.getElementById("finder");
+
+function runSearch(q){
+  const needle = q.trim().toLowerCase();
+  if (!needle) { router(); return; }
+
+  const hits = M.filter(m => {
+    const hay = [m.scenario, m.correct, m.your, m.why, m.official,
+                 TOPICS[m.topic].name, TOPICS[m.topic].short,
+                 "e" + m.exam + "q" + m.q, "q" + m.q].join(" ").toLowerCase();
+    return hay.includes(needle);
+  });
+
+  setCrumbs([{ t: "Arama" }, { t: `${hits.length} sonuç` }]);
+  view.innerHTML = `
+    <p class="eyebrow">Arama</p>
+    <h2 class="title">“${esc(q.trim())}”</h2>
+    <p class="lede">${hits.length} sonuç. Aramayı temizlemek için alanı boşalt veya Esc'e bas.</p>
+    ${ledger(hits, "Eşleşen yanlış yok. Başka bir terim dene.")}`;
+  window.scrollTo(0, 0);
+}
+
+let searchTimer = null;
+finderEl.addEventListener("input", e => {
+  const v = e.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => runSearch(v), 120);
+});
+finderEl.addEventListener("keydown", e => {
+  if (e.key === "Escape") { e.target.value = ""; e.target.blur(); router(); }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+    e.preventDefault(); finderEl.focus();
+  }
+});
+
+/* ============================================================
+   TEMA
+============================================================ */
+
+const themeBtn = document.getElementById("themeBtn");
+const THEME_KEY = "ccaf_theme";
+
+(function initTheme(){
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+  if (saved === "dark" || saved === "light") document.documentElement.setAttribute("data-theme", saved);
+})();
+
+themeBtn.addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = cur ? (cur === "dark" ? "light" : "dark") : (sysDark ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  themeBtn.setAttribute("aria-label", next === "dark" ? "Açık temaya geç" : "Koyu temaya geç");
+});
+
+/* ============================================================
+   MOBİL GEZİNME
+============================================================ */
+
+const railEl = document.getElementById("rail");
+const scrimEl = document.getElementById("scrim");
+const menuBtn = document.getElementById("menuBtn");
+
+menuBtn.addEventListener("click", () => {
+  const open = railEl.classList.toggle("open");
+  scrimEl.hidden = !open;
+  scrimEl.classList.toggle("show", open);
+  menuBtn.setAttribute("aria-expanded", String(open));
+});
+scrimEl.addEventListener("click", closeMobileNav);
+
+function closeMobileNav(){
+  railEl.classList.remove("open");
+  scrimEl.classList.remove("show");
+  scrimEl.hidden = true;
+  menuBtn.setAttribute("aria-expanded", "false");
+}
+
+/* ============================================================
+   BAŞLAT
+============================================================ */
+
+document.documentElement.lang = "tr";
+router();
+</script>
