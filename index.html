@@ -1065,13 +1065,31 @@ const EXAMS_BUILTIN = {
    DURUM — built-in kayıtlar + localStorage içe-aktarımı
 ============================================================ */
 
-const LS_KEY = "ccaf_imported_v2";
+const LS_KEY = "ccaf_state_v3";
+const LS_KEY_LEGACY = "ccaf_imported_v2";
 
+/* v2 → v3 tek seferlik taşıma: reviewLog + settings eklenir. Eski key güvenli
+   geri dönüş için silinmez; v3 bir kez yazıldıktan sonra ondan okunur. */
 function loadStore(){
+  const empty = { mistakes: [], exams: {}, reviewLog: {}, settings: {} };
   try {
-    const s = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-    return { mistakes: s.mistakes || [], exams: s.exams || {} };
-  } catch (e) { return { mistakes: [], exams: {} }; }
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) {
+      const legacy = localStorage.getItem(LS_KEY_LEGACY);
+      if (legacy) {
+        const s = JSON.parse(legacy);
+        const migrated = { mistakes: s.mistakes || [], exams: s.exams || {}, reviewLog: {}, settings: {} };
+        try { localStorage.setItem(LS_KEY, JSON.stringify(migrated)); } catch (e) {}
+        return migrated;
+      }
+      return empty;
+    }
+    const s = JSON.parse(raw);
+    return {
+      mistakes: s.mistakes || [], exams: s.exams || {},
+      reviewLog: s.reviewLog || {}, settings: s.settings || {},
+    };
+  } catch (e) { return empty; }
 }
 function persist(){ try { localStorage.setItem(LS_KEY, JSON.stringify(STORE)); } catch (e) {} }
 
@@ -1115,18 +1133,6 @@ const view = document.getElementById("view");
 const crumbEl = document.getElementById("crumbs");
 const mainEl = document.getElementById("main");
 
-const routes = {
-  "":            renderDashboard,
-  "mistakes":    renderMistakes,
-  "topics":      renderTopics,
-  "roadmap":     renderRoadmap,
-  "resources":   renderResources,
-  "conflicts":   renderConflicts,
-  "connections": renderConnections,
-  "notes":       renderNotes,
-  "import":      renderImport,
-};
-
 function parseHash(){
   const h = location.hash.replace(/^#\/?/, "");
   const [base, arg] = h.split("/");
@@ -1141,11 +1147,8 @@ function router(){
   if (finder) finder.value = "";
   window.scrollTo(0, 0);
 
-  if      (base === "q"     && arg) renderQuestion(arg);
-  else if (base === "topic" && arg) renderTopic(arg);
-  else if (base === "note"  && arg) renderNote(arg);
-  else if (routes[base])            routes[base]();
-  else                              renderDashboard();
+  const handler = App.router.routes[base] || App.router.routes["*"];
+  handler(arg);
 
   buildRail();
   closeMobileNav();
@@ -1158,25 +1161,26 @@ window.addEventListener("hashchange", router);
    KABUK — rail + breadcrumb
 ============================================================ */
 
-function navHTML(glyph, label, hash, count, active){
-  return `<a class="nav" href="#/${hash}"${active ? ' aria-current="page"' : ""}>
-    <span class="glyph" aria-hidden="true">${glyph}</span>
-    <span>${label}</span>
+/* Rail veri-güdümlü: App.router.navGroups üzerinden çizilir. Özellikler kendi
+   nav öğelerini App.router.addNav(group, item) ile ekler; bu fonksiyon dokunulmaz. */
+function navItemHTML(it, base, arg){
+  const active = it.active ? it.active(base, arg) : false;
+  const count = typeof it.count === "function" ? it.count() : it.count;
+  const badge = it.code
+    ? `<span class="mono-code" aria-hidden="true">${it.code}</span>`
+    : `<span class="glyph" aria-hidden="true">${it.glyph}</span>`;
+  return `<a class="nav" href="#/${it.hash}"${active ? ' aria-current="page"' : ""}>
+    ${badge}
+    <span>${it.label}</span>
     ${count != null ? `<span class="n">${count}</span>` : ""}
   </a>`;
 }
 
 function buildRail(){
   const { base, arg } = parseHash();
-  const conflicts = M.filter(m => m.verdict === "conflict").length;
-
-  const topicNav = Object.keys(TOPICS).map(k => {
-    const active = base === "topic" && arg === k;
-    return `<a class="nav" href="#/topic/${k}"${active ? ' aria-current="page"' : ""}>
-      <span class="mono-code" aria-hidden="true">${TOPIC_CODE[k]}</span>
-      <span>${TOPICS[k].short}</span>
-      <span class="n">${inTopic(k).length}</span>
-    </a>`;
+  const groups = App.router.navGroups.map(g => {
+    const items = g.items.map(it => navItemHTML(it, base, arg)).join("");
+    return `<div class="navgroup"><span class="glabel">${g.label}</span>${items}</div>`;
   }).join("");
 
   document.getElementById("rail").innerHTML = `
@@ -1187,27 +1191,7 @@ function buildRail(){
         <p>Yanlışlardan türetilmiş kişisel dosya</p>
       </a>
     </div>
-
-    <div class="navgroup">
-      <span class="glabel">Dosya</span>
-      ${navHTML("◆", "Panel", "", null, base === "")}
-      ${navHTML("▸", "Tüm yanlışlar", "mistakes", M.length, base === "mistakes" || base === "q")}
-      ${navHTML("⚠", "Kurs ↯ resmî çelişki", "conflicts", conflicts, base === "conflicts")}
-      ${navHTML("⇄", "Kavram bağlantıları", "connections", null, base === "connections")}
-      ${navHTML("⨁", "Test ekle", "import", STORE.mistakes.length || null, base === "import")}
-    </div>
-
-    <div class="navgroup">
-      <span class="glabel">Konular</span>
-      ${topicNav}
-    </div>
-
-    <div class="navgroup">
-      <span class="glabel">Çalışma</span>
-      ${navHTML("↳", "Yol haritası", "roadmap", null, base === "roadmap")}
-      ${navHTML("▤", "Notlar", "notes", NOTES.length, base === "notes" || base === "note")}
-      ${navHTML("❖", "Resmî kaynaklar", "resources", null, base === "resources")}
-    </div>`;
+    ${groups}`;
 }
 
 function setCrumbs(arr){
@@ -1247,7 +1231,7 @@ function rowHTML(m){
       ${topicTag(m.topic)}
       ${diffStars(m.diff)}
       ${m.verdict !== "ok" ? verdictChip(m.verdict) : ""}
-      ${isImported(m) ? `<span class="chip"><span class="dot"></span>İçe aktarıldı</span>` : ""}
+      ${isImported(m) ? badge("İçe aktarıldı") : ""}
     </div>
     <div class="rq">${field(m, "scenario")}</div>
     <div class="ra"><span class="k">Doğrusu:</span> ${short}</div>
@@ -1265,6 +1249,85 @@ function docHTML(title, url){
     <span class="g" aria-hidden="true">❖</span>
     <span class="m"><span class="t">${esc(title)}</span><span class="u">${esc(host)}</span></span>
     <span class="x" aria-hidden="true">↗</span>
+  </a>`;
+}
+
+/* ------------------------------------------------------------
+   Parça kütüphanesi — tekrar eden HTML tek yerde.
+   Görünüm değişince buradan değişir. Yeni özellikler App.components.* kullanır.
+------------------------------------------------------------ */
+
+/* Sayaç rozeti. Varsayılan nokta glifi; opts.cls/opts.glyph durum rozetleri için. */
+function badge(text, opts){
+  const o = opts || {};
+  const cls = o.cls ? " " + o.cls : "";
+  const mark = o.glyph ? `<span aria-hidden="true">${o.glyph}</span>` : `<span class="dot"></span>`;
+  return `<span class="chip${cls}">${mark}${text}</span>`;
+}
+
+/* İlerleme çubuğu. opts.muted → soluk (.q), opts.maxWidth → satır-içi genişlik. */
+function progressBar(pct, opts){
+  const o = opts || {};
+  const cls = o.muted ? " q" : "";
+  const style = o.maxWidth ? ` style="max-width:${o.maxWidth}"` : "";
+  return `<div class="bar${cls}"${style}><i style="width:${pct}%"></i></div>`;
+}
+
+/* Kılcal-kutu callout (.note). tone: acc | warn | ok. body ham HTML. */
+function callout(o){
+  const tone = o.tone ? " " + o.tone : "";
+  const reading = o.reading === false ? "" : " reading";
+  const style = o.style ? ` style="${o.style}"` : "";
+  const label = o.label
+    ? `<span class="mlabel">${o.glyph ? `<span aria-hidden="true">${o.glyph}</span>` : ""}${o.label}</span>`
+    : "";
+  return `<div class="note${tone}${reading}"${style}>${label}${o.body || ""}</div>`;
+}
+
+/* Sağ sütun içindekiler. items: [{href,label}] veya falsy (atlanır). */
+function toc(title, items){
+  const links = items.filter(Boolean).map(it => `<a href="${it.href}">${it.label}</a>`).join("");
+  return `<aside class="toc" aria-label="Sayfa içeriği">
+    <span class="mlabel">${title}</span>
+    ${links}
+  </aside>`;
+}
+
+/* Genel bölüm: başlık + gövde. Yeni view'lar için. */
+function section(title, body, opts){
+  const o = opts || {};
+  const id = o.id ? ` id="${o.id}"` : "";
+  return `<h3${id}>${title}</h3>${body}`;
+}
+
+/* Sınav kartı (panel). */
+function examCard(ex){
+  const pct = ex.total ? Math.round(ex.correct / ex.total * 100) : 0;
+  const pass = pct >= 72;
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+      <h4 style="margin:0">${esc(ex.name)}</h4>
+      <span class="small quiet">${esc(ex.attempt || "")}</span>
+    </div>
+    <div class="small quiet" style="margin:6px 0 14px">${ex.correct} doğru · ${ex.wrong} yanlış · ${ex.total} soru</div>
+    ${progressBar(pct)}
+    <div class="small quiet" style="margin-top:9px">
+      %${pct} · geçme eşiği ~%72
+      ${pass ? `<span class="chip v-ok" style="margin-left:6px"><span aria-hidden="true">✓</span>Geçer</span>`
+             : `<span class="chip v-warn" style="margin-left:6px"><span aria-hidden="true">◑</span>Eşik altı</span>`}
+    </div>
+  </div>`;
+}
+
+/* Not kartı (notlar listesi satırı). */
+function noteCard(n){
+  return `<a class="row" href="#/note/${n.id}">
+    <div class="rtop">
+      <span class="tcode">${TOPIC_CODE[n.topic]}</span>
+      <b>${n.title}</b>
+      ${badge(`${n.sections.length} bölüm`)}
+    </div>
+    <div class="ra">${n.summary}</div>
   </a>`;
 }
 
@@ -1292,9 +1355,9 @@ function renderDashboard(){
       <div class="rtop">
         <span class="tcode">${TOPIC_CODE[s.k]}</span>
         <b>${TOPICS[s.k].short}</b>
-        <span class="chip"><span class="dot"></span>${s.n} yanlış</span>
+        ${badge(`${s.n} yanlış`)}
       </div>
-      <div class="bar ${s.n >= 6 ? "" : "q"}" style="max-width:340px"><i style="width:${Math.round(s.n / maxN * 100)}%"></i></div>
+      ${progressBar(Math.round(s.n / maxN * 100), { muted: s.n < 6, maxWidth: "340px" })}
     </a>`).join("");
 
   view.innerHTML = `
@@ -1318,35 +1381,16 @@ function renderDashboard(){
 
     <h3>Sınav bazında</h3>
     <div class="grid g3">
-      ${examKeys.map(e => {
-        const ex = EXAMS[e];
-        const pct = ex.total ? Math.round(ex.correct / ex.total * 100) : 0;
-        const pass = pct >= 72;
-        return `<div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
-            <h4 style="margin:0">${esc(ex.name)}</h4>
-            <span class="small quiet">${esc(ex.attempt || "")}</span>
-          </div>
-          <div class="small quiet" style="margin:6px 0 14px">${ex.correct} doğru · ${ex.wrong} yanlış · ${ex.total} soru</div>
-          <div class="bar"><i style="width:${pct}%"></i></div>
-          <div class="small quiet" style="margin-top:9px">
-            %${pct} · geçme eşiği ~%72
-            ${pass ? `<span class="chip v-ok" style="margin-left:6px"><span aria-hidden="true">✓</span>Geçer</span>`
-                   : `<span class="chip v-warn" style="margin-left:6px"><span aria-hidden="true">◑</span>Eşik altı</span>`}
-          </div>
-        </div>`;
-      }).join("")}
+      ${examKeys.map(e => examCard(EXAMS[e])).join("")}
     </div>
 
     <h3>Tekrarlayan tek desen</h3>
-    <div class="note acc reading">
-      <span class="mlabel"><span aria-hidden="true">◆</span>Determinizm &gt; olasılık</span>
+    ${callout({ tone: "acc", glyph: "◆", label: "Determinizm &gt; olasılık", body: `
       <p>Yanlışlarının çoğu tek bir düşünce hatasından geliyor: bir davranışı prompt ile <i>rica etmek</i> ile
         sistem düzeyinde <b>garanti etmek</b> arasındaki farkı kaçırıyorsun. "Dikkatli ol" demek, few-shot örnek
         eklemek, CoT: hepsi olasılıksal. Doğru cevap neredeyse her zaman deterministik olan:
         <code>tool_choice</code> ile şema zorlama, programatik gate, multi-agent consensus, kaynağında temiz veri.</p>
-      <p style="margin-bottom:0"><a class="pill" href="#/connections">Kavram bağlantılarını gör →</a></p>
-    </div>
+      <p style="margin-bottom:0"><a class="pill" href="#/connections">Kavram bağlantılarını gör →</a></p>` })}
 
     <h3>Nereye çalışmalısın</h3>
     <p class="small quiet reading" style="margin-bottom:20px">Yanlış yoğunluğuna göre sıralı. Üstteki alan en çok tekrar isteyendir.</p>
@@ -1370,7 +1414,7 @@ function renderTopics(){
           <div class="rtop">
             <span class="tcode">${TOPIC_CODE[k]}</span>
             <b>${TOPICS[k].short}</b>
-            <span class="chip"><span class="dot"></span>${items.length} yanlış</span>
+            ${badge(`${items.length} yanlış`)}
           </div>
           <div class="ra">${TOPICS[k].name}</div>
         </a>`;
@@ -1445,7 +1489,7 @@ function renderTopic(k){
         <p class="eyebrow">${TOPIC_CODE[k]} · ${t.name}</p>
         <h2 class="title">${t.short}</h2>
         <div class="meta" style="margin-bottom:8px">
-          <span class="chip"><span class="dot"></span>${items.length} yanlış</span>
+          ${badge(`${items.length} yanlış`)}
           <span class="chip">Ortalama zorluk: ${["", "kolay", "orta", "zor"][avg] || "—"}</span>
           ${conf ? `<span class="chip v-conf"><span aria-hidden="true">⚠</span>${conf} çelişki</span>` : ""}
         </div>
@@ -1460,12 +1504,11 @@ function renderTopic(k){
 
         ${remember ? `<h3 id="akilda">Aklında kalsın</h3><div class="reading">${remember}</div>` : ""}
       </div>
-      <aside class="toc" aria-label="Sayfa içeriği">
-        <span class="mlabel">Bu sayfada</span>
-        <a href="#genel">Genel bakış</a>
-        <a href="#yanlislar">Yanlışların (${items.length})</a>
-        ${remember ? `<a href="#akilda">Aklında kalsın</a>` : ""}
-      </aside>
+      ${toc("Bu sayfada", [
+        { href: "#genel", label: "Genel bakış" },
+        { href: "#yanlislar", label: `Yanlışların (${items.length})` },
+        remember && { href: "#akilda", label: "Aklında kalsın" },
+      ])}
     </div>`;
 }
 
@@ -1516,6 +1559,9 @@ function renderQuestion(id){
           ${diffStars(m.diff)}
         </div>
         <h2 class="title" id="soru" style="font-size:1.55rem;max-width:var(--measure);font-weight:700">${field(m, "scenario")}</h2>
+
+        ${recallGate(m)}
+        <div id="recall-body" hidden>
         <div style="margin:0 0 32px">${verdictChip(m.verdict, true)}</div>
 
         <div class="reading">
@@ -1533,11 +1579,12 @@ function renderQuestion(id){
         <div class="reading">${field(m, "why")}</div>
 
         <h3 id="resmi">Resmî açıklama</h3>
-        <div class="note ${m.verdict === "conflict" ? "warn" : "acc"} reading">
-          <span class="mlabel"><span aria-hidden="true">${m.verdict === "conflict" ? "⚠" : "❖"}</span>${
-            m.verdict === "conflict" ? "Dikkat — kurs cevabı ≠ resmî doküman" : "Resmî dokümana göre"}</span>
-          <p style="margin-bottom:0">${field(m, "official")}</p>
-        </div>
+        ${callout({
+          tone: m.verdict === "conflict" ? "warn" : "acc",
+          glyph: m.verdict === "conflict" ? "⚠" : "❖",
+          label: m.verdict === "conflict" ? "Dikkat — kurs cevabı ≠ resmî doküman" : "Resmî dokümana göre",
+          body: `<p style="margin-bottom:0">${field(m, "official")}</p>`,
+        })}
 
         ${(m.docs || []).length ? `<h3 id="kaynak">Resmî kaynaklar</h3>
           <div class="reading">${m.docs.map(d => docHTML(d[0], d[1])).join("")}</div>` : ""}
@@ -1552,19 +1599,21 @@ function renderQuestion(id){
           <h4>İlişkili kavramlar</h4>
           <div class="pills">${m.concepts.map(c => `<a class="pill" href="#/connections">${CONCEPTS[c] || c}</a>`).join("")}</div>` : ""}
 
+        ${questionVersions(m)}
+        </div>
+
         <div class="btnrow" style="margin-top:44px;justify-content:space-between">
           ${prev ? `<a class="btn" href="#/q/${prev.id}"><span aria-hidden="true">←</span>E${prev.exam}·Q${prev.q}</a>` : "<span></span>"}
           ${next ? `<a class="btn" href="#/q/${next.id}">E${next.exam}·Q${next.q}<span aria-hidden="true">→</span></a>` : "<span></span>"}
         </div>
       </div>
-      <aside class="toc" aria-label="Sayfa içeriği">
-        <span class="mlabel">Bu soruda</span>
-        <a href="#soru">Soru</a>
-        <a href="#neden">Neden kaçırdın</a>
-        <a href="#resmi">Resmî açıklama</a>
-        ${(m.docs || []).length ? `<a href="#kaynak">Kaynaklar</a>` : ""}
-        ${rel.length ? `<a href="#ilgili">İlgili sorular</a>` : ""}
-      </aside>
+      ${toc("Bu soruda", [
+        { href: "#soru", label: "Soru" },
+        { href: "#neden", label: "Neden kaçırdın" },
+        { href: "#resmi", label: "Resmî açıklama" },
+        (m.docs || []).length && { href: "#kaynak", label: "Kaynaklar" },
+        rel.length && { href: "#ilgili", label: "İlgili sorular" },
+      ])}
     </div>`;
 }
 
@@ -1635,7 +1684,12 @@ function renderConnections(){
     ${groups.map(g => `
       <h3>${g.label} <span class="quiet">(${g.items.length})</span></h3>
       <div class="pills">${g.items.map(m => `<a class="pill" href="#/q/${m.id}">
-        <span class="tcode">${TOPIC_CODE[m.topic]}</span>E${m.exam}·Q${m.q}</a>`).join("")}</div>`).join("")}`;
+        <span class="tcode">${TOPIC_CODE[m.topic]}</span>E${m.exam}·Q${m.q}</a>`).join("")}</div>`).join("")}
+
+    ${Object.keys(VERSIONS).length ? `<hr class="rule" style="margin:48px 0 0" />
+      <h3>Sürüm geçmişi</h3>
+      <p class="small quiet reading" style="margin-bottom:20px">Bu kavramlar zamanla değişti. Resmî dokümanla doğrulanmış geçişler.</p>
+      ${Object.keys(VERSIONS).map(c => `<h4>${CONCEPTS[c] || c} <span class="quiet">— ${esc(VERSIONS[c].title)}</span></h4>${versionTimeline(c)}`).join("")}` : ""}`;
 }
 
 /* ============================================================
@@ -1649,14 +1703,7 @@ function renderNotes(){
     <h2 class="title">Çalışma notları</h2>
     <p class="lede">Dokümantasyondan derlediğin püf noktaları. Yanlışlarından bağımsız, doğrudan çalışmak istediğin konular.</p>
     <div class="ledger">
-      ${NOTES.map(n => `<a class="row" href="#/note/${n.id}">
-        <div class="rtop">
-          <span class="tcode">${TOPIC_CODE[n.topic]}</span>
-          <b>${n.title}</b>
-          <span class="chip"><span class="dot"></span>${n.sections.length} bölüm</span>
-        </div>
-        <div class="ra">${n.summary}</div>
-      </a>`).join("")}
+      ${NOTES.map(noteCard).join("")}
     </div>`;
 }
 
@@ -1685,12 +1732,11 @@ function renderNote(id){
           <div class="pills">${rel.map(r => `<a class="pill" href="#/q/${r.id}">
             <span class="tcode">${TOPIC_CODE[r.topic]}</span>E${r.exam}·Q${r.q}</a>`).join("")}</div>` : ""}
       </div>
-      <aside class="toc" aria-label="Sayfa içeriği">
-        <span class="mlabel">Bu notta</span>
-        ${n.sections.map(s => `<a href="#${s.id}">${s.h}</a>`).join("")}
-        <a href="#kaynak">Resmî kaynak</a>
-        ${rel.length ? `<a href="#ilgili">İlgili yanlışlar</a>` : ""}
-      </aside>
+      ${toc("Bu notta", [
+        ...n.sections.map(s => ({ href: `#${s.id}`, label: s.h })),
+        { href: "#kaynak", label: "Resmî kaynak" },
+        rel.length && { href: "#ilgili", label: "İlgili yanlışlar" },
+      ])}
     </div>`;
 }
 
@@ -1758,7 +1804,7 @@ function renderResources(){
       Dosyadaki her açıklama bunlardan doğrulandı.</p>
     ${Object.entries(buckets).map(([name, ds]) => ds.length
       ? `<h3>${name} <span class="quiet">(${ds.length})</span></h3>
-         <div class="reading">${ds.map(d => docHTML(d[0], d[1])).join("")}</div>` : "").join("")}
+         <div class="reading">${ds.map(d => docNodeLink(d)).join("")}</div>` : "").join("")}
     <div class="note acc reading" style="margin-top:44px">
       <span class="mlabel"><span aria-hidden="true">◆</span>Çalışma disiplini</span>
       <p style="margin-bottom:0">Bir soruyu tekrar ederken önce kendi cevabını hatırla, sonra resmî kaynağı aç ve <b>neden</b>
@@ -2094,6 +2140,572 @@ function closeMobileNav(){
    BAŞLAT
 ============================================================ */
 
-document.documentElement.lang = "tr";
-router();
+/* ============================================================
+   APP — tek namespace + uzatma noktaları
+
+   Yaprak yardımcılar (esc, byId, verdictChip, M/EXAMS/STORE) kısa adlarıyla
+   top-level kalır — HTML şablonlarında düzinelerce kez geçtikleri için — ve
+   buraya referansla bağlanır. Yeni özellikler YALNIZCA App.* yüzeyine yazar:
+   App.views.x, App.services.x, App.router.add(...), App.router.addNav(...).
+============================================================ */
+
+const App = {
+  config: { LS_KEY, LS_KEY_LEGACY, THEME_KEY, TOPIC_CODE, VERDICT },
+
+  data: {
+    TOPICS, CONCEPTS, NOTES, mistakes: M_BUILTIN, exams: EXAMS_BUILTIN,
+    byId, inTopic, isImported,
+    get M(){ return M; }, get EXAMS(){ return EXAMS; }, get STORE(){ return STORE; },
+  },
+
+  state: {
+    get reviewLog(){ return STORE.reviewLog; },
+    get mFilter(){ return mFilter; }, set mFilter(v){ mFilter = v; },
+  },
+
+  storage: { load: loadStore, persist, rebuild },
+
+  utils: { esc, field, host: hostOf },
+
+  components: {
+    topicTag, diffStars, verdictChip, row: rowHTML, questionCard: rowHTML,
+    ledger, doc: docHTML, badge, progressBar, callout, toc, section, examCard, noteCard,
+  },
+
+  /* Faz 3'te dolar. Özellikler kendi servisini buraya ekler. */
+  services: { analytics: {}, graph: {}, learning: {}, import: {}, search: {} },
+
+  router: {
+    routes: {}, navGroups: [],
+    parseHash, setCrumbs, buildRail, refresh: router,
+    go(hash){ location.hash = hash; },
+    add(base, handler){ this.routes[base] = handler; return this; },
+    addNav(group, item, atStart){
+      let g = this.navGroups.find(x => x.label === group);
+      if (!g) { g = { label: group, items: [] }; this.navGroups.push(g); }
+      if (atStart) g.items.unshift(item); else g.items.push(item);
+      return this;
+    },
+  },
+
+  views: {
+    dashboard: renderDashboard, topics: renderTopics, topic: renderTopic,
+    mistakes: renderMistakes, question: renderQuestion, conflicts: renderConflicts,
+    connections: renderConnections, notes: renderNotes, note: renderNote,
+    roadmap: renderRoadmap, resources: renderResources, import: renderImport,
+    search: runSearch,
+  },
+
+  init(){
+    document.documentElement.lang = "tr";
+    router();
+  },
+};
+
+/* --- Çekirdek rota kaydı (statik + parametreli tek tabloda) --- */
+App.router
+  .add("",            () => renderDashboard())
+  .add("mistakes",    () => renderMistakes())
+  .add("topics",      () => renderTopics())
+  .add("roadmap",     () => renderRoadmap())
+  .add("resources",   () => renderResources())
+  .add("conflicts",   () => renderConflicts())
+  .add("connections", () => renderConnections())
+  .add("notes",       () => renderNotes())
+  .add("import",      () => renderImport())
+  .add("q",           arg => renderQuestion(arg))
+  .add("topic",       arg => renderTopic(arg))
+  .add("note",        arg => renderNote(arg))
+  .add("*",           () => renderDashboard());
+
+/* --- Çekirdek rail kaydı (mevcut düzeni birebir üretir) --- */
+App.router
+  .addNav("Dosya", { glyph: "◆", label: "Panel", hash: "", active: b => b === "" })
+  .addNav("Dosya", { glyph: "▸", label: "Tüm yanlışlar", hash: "mistakes",
+                     count: () => M.length, active: b => b === "mistakes" || b === "q" })
+  .addNav("Dosya", { glyph: "⚠", label: "Kurs ↯ resmî çelişki", hash: "conflicts",
+                     count: () => M.filter(m => m.verdict === "conflict").length, active: b => b === "conflicts" })
+  .addNav("Dosya", { glyph: "⇄", label: "Kavram bağlantıları", hash: "connections", active: b => b === "connections" })
+  .addNav("Dosya", { glyph: "⨁", label: "Test ekle", hash: "import",
+                     count: () => STORE.mistakes.length || null, active: b => b === "import" });
+
+Object.keys(TOPICS).forEach(k => {
+  App.router.addNav("Konular", {
+    code: TOPIC_CODE[k], label: TOPICS[k].short, hash: `topic/${k}`,
+    count: () => inTopic(k).length, active: (b, a) => b === "topic" && a === k,
+  });
+});
+
+App.router
+  .addNav("Çalışma", { glyph: "↳", label: "Yol haritası", hash: "roadmap", active: b => b === "roadmap" })
+  .addNav("Çalışma", { glyph: "▤", label: "Notlar", hash: "notes",
+                       count: () => NOTES.length, active: b => b === "notes" || b === "note" })
+  .addNav("Çalışma", { glyph: "❖", label: "Resmî kaynaklar", hash: "resources", active: b => b === "resources" });
+
+/* ============================================================
+   SERVİSLER — saf mantık, UI yok. Faz 4 özellikleri bunlara dayanır.
+   reviewLog okunur; not/derece YOK — yalnızca tekrar sinyali (zaman + sayı).
+============================================================ */
+
+const analytics = {
+  DAY: 864e5,
+
+  /* Konu yanlış yoğunluğu, çoktan aza. */
+  topicLoad(){
+    return Object.keys(TOPICS)
+      .map(k => ({ topic: k, count: inTopic(k).length }))
+      .sort((a, b) => b.count - a.count);
+  },
+  weakTopics(n = 3){ return analytics.topicLoad().slice(0, n); },
+  strongTopics(n = 3){ return analytics.topicLoad().slice().reverse().slice(0, n); },
+
+  conflictCount(){ return M.filter(m => m.verdict === "conflict").length; },
+  datedCount(){ return M.filter(m => m.verdict === "dated").length; },
+
+  reviewCount(id){ const l = STORE.reviewLog[id]; return l ? l.length : 0; },
+  lastReviewed(id){ const l = STORE.reviewLog[id]; return l && l.length ? l[l.length - 1] : null; },
+  daysSince(id){ const t = analytics.lastReviewed(id); return t == null ? Infinity : (Date.now() - t) / analytics.DAY; },
+
+  /* Ustalık 0..1: tekrar derinliği + tazelik. Derece değil, tekrar sinyali. */
+  mastery(id){
+    const c = analytics.reviewCount(id);
+    if (!c) return 0;
+    const recency = Math.max(0, 1 - analytics.daysSince(id) / 30); // ~30 günde unutma
+    const depth = Math.min(1, c / 3);                              // ~3 tekrarda oturur
+    return Math.round((0.5 * depth + 0.5 * recency) * 100) / 100;
+  },
+
+  /* Tekrar önceliği (yüksek = önce). Hiç görülmemiş / vadesi geçmiş / çelişki / zor öne çıkar. */
+  reviewPriority(id){
+    const m = byId(id); if (!m) return 0;
+    const c = analytics.reviewCount(id);
+    const d = analytics.daysSince(id);
+    const overdue = d === Infinity ? 2 : Math.min(2, d / 14);
+    const conflictBoost = m.verdict === "conflict" ? 1 : (m.verdict === "dated" ? 0.5 : 0);
+    const diffBoost = (m.diff || 1) / 3;
+    const unseen = c === 0 ? 1 : 0;
+    return overdue + conflictBoost + diffBoost + unseen;
+  },
+
+  /* Son `days` günün günlük review sayıları, eski→yeni. */
+  trend(days = 14){
+    const now = Date.now(); const buckets = {};
+    for (const id in STORE.reviewLog) {
+      for (const t of STORE.reviewLog[id]) {
+        const idx = Math.floor((now - t) / analytics.DAY);
+        if (idx >= 0 && idx < days) buckets[idx] = (buckets[idx] || 0) + 1;
+      }
+    }
+    const arr = []; for (let i = days - 1; i >= 0; i--) arr.push(buckets[i] || 0);
+    return arr;
+  },
+
+  totalReviews(){ let n = 0; for (const id in STORE.reviewLog) n += STORE.reviewLog[id].length; return n; },
+  reviewedCount(){ return Object.keys(STORE.reviewLog).filter(id => STORE.reviewLog[id].length).length; },
+
+  stats(){
+    return {
+      weakTopics: analytics.weakTopics(), strongTopics: analytics.strongTopics(),
+      conflictCount: analytics.conflictCount(), datedCount: analytics.datedCount(),
+      totalReviews: analytics.totalReviews(), reviewedCount: analytics.reviewedCount(),
+      total: M.length, trend: analytics.trend(),
+    };
+  },
+};
+App.services.analytics = analytics;
+
+const graphSvc = {
+  /* Zincirlenebilir filtre. App.services.graph.query().topic("pe").verdict("conflict").results() */
+  query(source){
+    let items = (source || M).slice();
+    const api = {
+      topic(t){ items = items.filter(m => m.topic === t); return api; },
+      concept(c){ items = items.filter(m => (m.concepts || []).includes(c)); return api; },
+      verdict(v){ items = items.filter(m => m.verdict === v); return api; },
+      exam(n){ items = items.filter(m => String(m.exam) === String(n)); return api; },
+      diff(d){ items = items.filter(m => m.diff === d); return api; },
+      diffGte(d){ items = items.filter(m => (m.diff || 0) >= d); return api; },
+      docHost(h){ items = items.filter(m => (m.docs || []).some(d => hostOf(d[1]).includes(h))); return api; },
+      imported(flag = true){ items = items.filter(m => isImported(m) === flag); return api; },
+      reviewedWithin(days){ const cut = Date.now() - days * analytics.DAY;
+        items = items.filter(m => { const l = STORE.reviewLog[m.id]; return l && l.some(t => t >= cut); }); return api; },
+      unreviewed(){ items = items.filter(m => { const l = STORE.reviewLog[m.id]; return !l || !l.length; }); return api; },
+      where(fn){ items = items.filter(fn); return api; },
+      sort(fn){ items = items.slice().sort(fn); return api; },
+      limit(n){ items = items.slice(0, n); return api; },
+      results(){ return items; },
+      count(){ return items.length; },
+      ids(){ return items.map(m => m.id); },
+    };
+    return api;
+  },
+
+  byConcept(c){ return graphSvc.query().concept(c).results(); },
+
+  /* Docs-as-node çekirdeği: her benzersiz doc URL → onu referanslayan sorular + kavramlar. F-E kullanır. */
+  docIndex(){
+    const idx = {};
+    for (const m of M) {
+      for (const d of (m.docs || [])) {
+        const url = d[1];
+        if (!idx[url]) idx[url] = { title: d[0], url, host: hostOf(url), questions: [], concepts: new Set() };
+        idx[url].questions.push(m.id);
+        for (const c of (m.concepts || [])) idx[url].concepts.add(c);
+      }
+    }
+    return Object.values(idx).map(x => ({ ...x, concepts: [...x.concepts] }));
+  },
+};
+App.services.graph = graphSvc;
+
+/* URL host'u güvenli çıkar (paylaşılan yardımcı). */
+function hostOf(url){ try { return new URL(url).host; } catch (e) { return String(url); } }
+
+/* ============================================================
+   FEATURE UZATMA NOKTASI
+   Faz 4 özellikleri buradan sonra kendi bloklarında yaşar:
+     /* === FEATURE: <ad> === *\/  … kod …  /* === /FEATURE === *\/
+   Her özellik: App.views.x + App.services.x tanımlar,
+   App.router.add(...) / addNav(...) ile kaydeder. Üstteki hiçbir şeyi düzenlemez.
+============================================================ */
+
+/* === FEATURE: LEARNING-ANALYTICS (#/analytics) === */
+function renderAnalytics(){
+  setCrumbs([{ t: "Öğrenme analitiği" }]);
+  const A = App.services.analytics;
+  const s = A.stats();
+  const noReviews = s.totalReviews === 0;
+
+  const topicRows = A.topicLoad().map(({ topic, count }) => {
+    const items = inTopic(topic);
+    const ms = items.map(m => A.mastery(m.id));
+    const avg = ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length * 100) : 0;
+    const reviewed = items.filter(m => A.reviewCount(m.id) > 0).length;
+    return `<a class="row" href="#/topic/${topic}">
+      <div class="rtop">
+        <span class="tcode">${TOPIC_CODE[topic]}</span>
+        <b>${TOPICS[topic].short}</b>
+        ${badge(`${count} yanlış`)}
+        ${badge(`${reviewed}/${count} tekrar edildi`, { glyph: "◷" })}
+      </div>
+      ${progressBar(avg, { muted: avg < 50, maxWidth: "340px" })}
+      <div class="small quiet" style="margin-top:6px">Ustalık %${avg}</div>
+    </a>`;
+  }).join("");
+
+  const max = Math.max(1, ...s.trend);
+  const spark = `<div style="display:flex;align-items:flex-end;gap:3px;height:52px;max-width:440px;margin-bottom:8px">
+    ${s.trend.map(v => `<span title="${v} tekrar" style="flex:1;background:var(--garnet);opacity:${v ? 0.85 : 0.16};height:${Math.max(6, Math.round(v / max * 100))}%;border-radius:2px"></span>`).join("")}
+  </div>
+  <div class="small quiet">Eski → yeni · en yüksek gün ${max} tekrar</div>`;
+
+  const pillRow = arr => `<div class="pills">${arr.map(t =>
+    `<a class="pill" href="#/topic/${t.topic}"><span class="tcode">${TOPIC_CODE[t.topic]}</span>${TOPICS[t.topic].short} · ${t.count}</a>`).join("")}</div>`;
+
+  view.innerHTML = `
+    <p class="eyebrow">Ölçüm</p>
+    <h2 class="title">Öğrenme analitiği</h2>
+    <p class="lede">Tekrar sinyalinden türetildi — kendine not verme yok. Bir soruyu açıp cevabını gördükçe ustalık ve trend dolar.</p>
+
+    <div class="strip">
+      <div><div class="n">${s.total}</div><div class="l">Toplam yanlış</div></div>
+      <div><div class="n">${s.reviewedCount}</div><div class="l">Tekrar edilen soru</div></div>
+      <div><div class="n">${s.totalReviews}</div><div class="l">Toplam tekrar</div></div>
+      <div><div class="n acc">${s.conflictCount}</div><div class="l">Kurs ↯ resmî çelişki</div></div>
+    </div>
+
+    <h3>Tekrar trendi <span class="quiet">(son 14 gün)</span></h3>
+    ${noReviews
+      ? callout({ tone: "acc", glyph: "◆", label: "Henüz tekrar kaydın yok", body: `<p style="margin-bottom:0">Bir soruyu aç, cevabını düşün, sonra <b>Cevabımı gördüm</b>'e bas. Buradaki ustalık ve trend o kayıtlardan dolar. <a class="pill" href="#/today">Bugüne başla →</a></p>` })
+      : spark}
+
+    <h3>Konu ustalığı</h3>
+    <p class="small quiet reading" style="margin-bottom:20px">Her konunun tekrar-tabanlı ustalığı. Düşük = tekrar isteyen.</p>
+    <div class="ledger">${topicRows}</div>
+
+    <div class="grid g2" style="margin-top:44px">
+      <div><h4>En zayıf</h4>${pillRow(s.weakTopics)}</div>
+      <div><h4>En güçlü</h4>${pillRow(s.strongTopics)}</div>
+    </div>`;
+}
+App.views.analytics = renderAnalytics;
+App.router.add("analytics", () => renderAnalytics());
+App.router.addNav("Çalışma", { glyph: "▦", label: "Analitik", hash: "analytics", active: b => b === "analytics" }, true);
+/* === /FEATURE === */
+
+/* === FEATURE: ACTIVE-RECALL (soru reveal-gate) === */
+/* Cevap baştan gizli; kullanıcı hatırlamaya çalışır, sonra açar. Açılış bir
+   review olayı yazar (not/derece YOK). renderQuestion #recall-gate + #recall-body üretir. */
+function recallAgo(ts){
+  if (ts == null) return "—";
+  const d = Math.floor((Date.now() - ts) / 864e5);
+  return d <= 0 ? "bugün" : (d === 1 ? "dün" : d + " gün önce");
+}
+function recallGate(m){
+  const A = App.services.analytics;
+  const c = A.reviewCount(m.id);
+  const seen = c
+    ? `<span class="small quiet"><span aria-hidden="true">◷</span> ${c} kez tekrar edildi · son ${recallAgo(A.lastReviewed(m.id))}</span>`
+    : `<span class="small quiet">Bu soruyu ilk kez tekrar ediyorsun.</span>`;
+  return `<div id="recall-gate" class="note acc reading">
+    <span class="mlabel"><span aria-hidden="true">◆</span>Aktif hatırlama</span>
+    <p>Cevabı açmadan önce kendine sor: doğrusu ne, sen ne demiştin, neden kaçırdın? Hazır olunca aç.</p>
+    <div class="btnrow" style="margin-top:4px;align-items:center;gap:16px">
+      <button class="btn pri" onclick="recallReveal('${m.id}')">Cevabımı gördüm — Göster</button>
+      ${seen}
+    </div>
+  </div>`;
+}
+function recallReveal(id){
+  const body = document.getElementById("recall-body");
+  const gate = document.getElementById("recall-gate");
+  if (body) body.hidden = false;
+  if (gate) gate.hidden = true;
+  (STORE.reviewLog[id] = STORE.reviewLog[id] || []).push(Date.now());
+  persist();
+}
+App.services.learning = App.services.learning || {};
+App.services.recall = { reveal: recallReveal, gate: recallGate, ago: recallAgo };
+/* === /FEATURE === */
+
+/* === FEATURE: LEARNING-ENGINE (#/today) === */
+/* Statik roadmap değil: tekrar geçmişi + yanlış yoğunluğundan bugünün planı. */
+const learning = {
+  reviewQueue(n = 7){
+    const A = App.services.analytics;
+    return App.services.graph.query()
+      .sort((a, b) => A.reviewPriority(b.id) - A.reviewPriority(a.id))
+      .limit(n).results();
+  },
+  focusTopic(){ return App.services.analytics.weakTopics(1)[0]; },
+  readingDocs(n = 2){
+    const ft = learning.focusTopic(); if (!ft) return [];
+    const ids = new Set(inTopic(ft.topic).map(m => m.id));
+    return App.services.graph.docIndex()
+      .filter(d => d.questions.some(q => ids.has(q)))
+      .sort((a, b) => b.questions.length - a.questions.length)
+      .slice(0, n);
+  },
+  miniQuiz(n = 5){
+    const ft = learning.focusTopic(); if (!ft) return [];
+    const A = App.services.analytics;
+    return App.services.graph.query(inTopic(ft.topic))
+      .sort((a, b) => A.reviewPriority(b.id) - A.reviewPriority(a.id))
+      .limit(n).results();
+  },
+  plan(){
+    return { reviewQueue: learning.reviewQueue(), focusTopic: learning.focusTopic(),
+             readingDocs: learning.readingDocs(), miniQuiz: learning.miniQuiz() };
+  },
+};
+App.services.learning = learning;
+
+function renderToday(){
+  setCrumbs([{ t: "Bugün" }]);
+  const A = App.services.analytics;
+  const plan = learning.plan();
+  const ft = plan.focusTopic;
+
+  const reviewList = plan.reviewQueue.map(m => `<a class="row" href="#/q/${m.id}">
+    <div class="rtop">
+      <span class="rid">E${m.exam}·Q${m.q}</span>
+      ${topicTag(m.topic)}
+      ${m.verdict !== "ok" ? verdictChip(m.verdict) : ""}
+      ${A.reviewCount(m.id)
+        ? badge(`${A.reviewCount(m.id)}× · ${recallAgo(A.lastReviewed(m.id))}`, { glyph: "◷" })
+        : badge("hiç görülmedi", { glyph: "◆" })}
+    </div>
+    <div class="rq">${field(m, "scenario")}</div>
+  </a>`).join("");
+
+  const docList = plan.readingDocs.map(d =>
+    `<div style="margin-bottom:10px">${docHTML(d.title, d.url)}
+      <div class="small quiet" style="margin:2px 0 0 34px">${d.questions.length} soruda geçiyor</div></div>`).join("");
+
+  const quizPills = plan.miniQuiz.map(m =>
+    `<a class="pill" href="#/q/${m.id}"><span class="tcode">${TOPIC_CODE[m.topic]}</span>E${m.exam}·Q${m.q}</a>`).join("");
+
+  view.innerHTML = `
+    <p class="eyebrow">Çalışma motoru</p>
+    <h2 class="briefing">Bugün${ft ? ` <span class="quiet">${TOPICS[ft.topic].short}</span>` : ""}</h2>
+    <p class="lede">Statik liste değil — tekrar geçmişin ve yanlış yoğunluğundan türetilmiş bugünün planı. Yukarıdan aşağı takip et; bittiğinde günün tamam.</p>
+
+    <h3>1 · Tekrar et <span class="quiet">(${plan.reviewQueue.length} soru)</span></h3>
+    <p class="small quiet reading" style="margin-bottom:20px">Öncelik: hiç görülmemiş, vadesi geçmiş, çelişkili ve zor sorular önce.</p>
+    <div class="ledger">${reviewList}</div>
+
+    ${ft ? `<h3 style="margin-top:48px">2 · Odak konu</h3>
+      ${callout({ tone: "acc", glyph: "◆", label: `${TOPIC_CODE[ft.topic]} · ${TOPICS[ft.topic].short}`, body: `<p style="margin-bottom:0">En çok yanlışın burada (${ft.count}). Konunun "aklında kalsın" özetini oku, sonra soruları tekrar et. <a class="pill" href="#/topic/${ft.topic}">Konuya git →</a></p>` })}` : ""}
+
+    ${docList ? `<h3 style="margin-top:48px">3 · Oku <span class="quiet">(${plan.readingDocs.length} doküman)</span></h3>
+      <p class="small quiet reading" style="margin-bottom:16px">Odak konudaki soruların en çok dayandığı resmî kaynaklar.</p>
+      <div class="reading">${docList}</div>` : ""}
+
+    ${quizPills ? `<h3 style="margin-top:48px">4 · Mini quiz</h3>
+      <p class="small quiet reading" style="margin-bottom:16px">Odak konudan ${plan.miniQuiz.length} soru. İlkinden başla, her birinde önce cevabını düşün.</p>
+      <div class="btnrow" style="margin-bottom:14px"><a class="btn pri" href="#/q/${plan.miniQuiz[0].id}">Quiz'e başla →</a></div>
+      <div class="pills">${quizPills}</div>` : ""}`;
+}
+App.views.today = renderToday;
+App.router.add("today", () => renderToday());
+App.router.addNav("Çalışma", { glyph: "◆", label: "Bugün", hash: "today", active: b => b === "today" }, true);
+/* === /FEATURE === */
+
+/* === FEATURE: GRAPH-QUERY (#/query) === */
+/* graph.query() zincirini görsel filtreye bağlar. Anlık sonuç, sayfa yeniden çizilmez. */
+function qVal(id){ const el = document.getElementById(id); return el ? el.value : ""; }
+
+function runQuery(){
+  const g = App.services.graph;
+  const t = qVal("qTopic"), vd = qVal("qVerdict"), df = +qVal("qDiff") || 0, dh = qVal("qHost"), rv = qVal("qReviewed");
+  let q = g.query();
+  if (t)  q = q.topic(t);
+  if (vd) q = q.verdict(vd);
+  if (df) q = q.diffGte(df);
+  if (dh) q = q.docHost(dh);
+  if (rv === "yes") q = q.reviewedWithin(1e6);
+  if (rv === "no")  q = q.unreviewed();
+  const res = q.results();
+
+  const chain = ["query()", t && `.topic("${t}")`, vd && `.verdict("${vd}")`, df && `.diffGte(${df})`,
+    dh && `.docHost("${dh}")`, rv === "yes" && ".reviewedWithin(∞)", rv === "no" && ".unreviewed()"]
+    .filter(Boolean).join("");
+
+  document.getElementById("qresults").innerHTML = `
+    <div class="meta" style="margin:6px 0 6px"><b>${res.length}</b> sonuç</div>
+    <pre class="qchain" style="font-family:var(--mono);font-size:.78rem;color:var(--ink-2);background:var(--surface-sunk);padding:8px 12px;border-radius:4px;margin:0 0 20px;overflow-x:auto">${esc(chain)}</pre>
+    ${ledger(res, "Bu filtreyle eşleşen yanlış yok. Bir filtreyi gevşet.")}`;
+}
+
+function renderQuery(){
+  setCrumbs([{ t: "Graph sorgu" }]);
+  const hosts = [...new Set(App.services.graph.docIndex().map(d => d.host))].sort();
+  const sel = (id, opts) => `<select id="${id}" onchange="runQuery()" style="padding:7px 10px;border:1px solid var(--rule-2);background:var(--surface-raise);color:var(--ink);border-radius:3px;font:inherit">
+    ${opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
+
+  view.innerHTML = `
+    <p class="eyebrow">Bilgi grafiği</p>
+    <h2 class="title">Graph sorgu</h2>
+    <p class="lede">Filtreleri zincirle: konu + verdict + zorluk + resmî kaynak + tekrar durumu. Sonuç ve eşdeğer sorgu ifadesi anında güncellenir.</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:14px 18px;align-items:end;margin-bottom:12px">
+      <label class="small quiet" style="display:flex;flex-direction:column;gap:6px">Konu${sel("qTopic", [["", "Tümü"], ...Object.keys(TOPICS).map(k => [k, TOPICS[k].short])])}</label>
+      <label class="small quiet" style="display:flex;flex-direction:column;gap:6px">Verdict${sel("qVerdict", [["", "Tümü"], ["ok", "Uyumlu"], ["conflict", "Çelişki"], ["dated", "Güncel değil"], ["authoritative", "Referans"], ["unverified", "Doğrulanmadı"]])}</label>
+      <label class="small quiet" style="display:flex;flex-direction:column;gap:6px">Min zorluk${sel("qDiff", [["0", "Tümü"], ["1", "≥ kolay"], ["2", "≥ orta"], ["3", "= zor"]])}</label>
+      <label class="small quiet" style="display:flex;flex-direction:column;gap:6px">Kaynak${sel("qHost", [["", "Tümü"], ...hosts.map(h => [h, h])])}</label>
+      <label class="small quiet" style="display:flex;flex-direction:column;gap:6px">Tekrar${sel("qReviewed", [["", "Tümü"], ["yes", "Tekrar edilenler"], ["no", "Hiç edilmeyenler"]])}</label>
+    </div>
+
+    <div id="qresults"></div>`;
+  runQuery();
+}
+App.views.query = renderQuery;
+App.router.add("query", () => renderQuery());
+App.router.addNav("Dosya", { glyph: "⊞", label: "Graph sorgu", hash: "query", active: b => b === "query" });
+/* === /FEATURE === */
+
+/* === FEATURE: DOCS-AS-NODE (#/doc/:slug) === */
+/* Doküman artık pasif link değil düğüm: onu kullanan sorular + kavramlar burada birleşir.
+   Türetilmiş veri graph.docIndex()'ten gelir. DOCS_META opsiyonel elle zenginleştirme
+   (alıntı paragraf) tutar — boşsa sayfa yine tam çalışır, uydurma içerik yok. */
+const DOCS_META = {
+  // "https://docs.anthropic.com/...": { paragraph: "resmî dokümandan birebir alıntı" },
+};
+
+function docSlug(url){
+  let h = 0; for (let i = 0; i < url.length; i++) h = (h * 31 + url.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+/* Kaynaklar sayfası için: dışa değil doküman düğümüne (içe) link. */
+function docNodeLink(d){
+  return `<a class="doc" href="#/doc/${docSlug(d[1])}">
+    <span class="g" aria-hidden="true">❖</span>
+    <span class="m"><span class="t">${esc(d[0])}</span><span class="u">${esc(hostOf(d[1]))} · detay</span></span>
+    <span class="x" aria-hidden="true">→</span>
+  </a>`;
+}
+
+function renderDoc(slug){
+  const doc = App.services.graph.docIndex().find(d => docSlug(d.url) === slug);
+  if (!doc) return renderResources();
+  setCrumbs([{ t: "Resmî kaynaklar", h: "#/resources" }, { t: doc.title }]);
+  const meta = DOCS_META[doc.url] || {};
+  const questions = doc.questions.map(byId).filter(Boolean);
+
+  view.innerHTML = `
+    <div class="with-toc">
+      <div>
+        <a class="back" href="#/resources"><span aria-hidden="true">←</span>Resmî kaynaklar</a>
+        <p class="eyebrow">${esc(doc.host)}</p>
+        <h2 class="title" id="dtop">${esc(doc.title)}</h2>
+        <div class="btnrow" style="margin:8px 0 28px">
+          <a class="btn pri" href="${esc(doc.url)}" target="_blank" rel="noopener noreferrer">Resmî dokümanı aç ↗</a>
+        </div>
+
+        ${meta.paragraph
+          ? `<h3 id="alinti">İlgili paragraf</h3>${callout({ tone: "acc", glyph: "❖", label: "Dokümandan", body: `<p style="margin-bottom:0">${meta.paragraph}</p>` })}`
+          : callout({ tone: "acc", glyph: "◷", label: "Alıntı henüz eklenmedi", body: `<p style="margin-bottom:0">Bu kaynaktan birebir paragraf DOCS_META'ya eklenince burada vurgulanır. Şimdilik dokümanı açıp okuyabilirsin.</p>` })}
+
+        <h3 id="sorular">Bu kaynağı kullanan sorular <span class="quiet">(${questions.length})</span></h3>
+        <p class="small quiet reading" style="margin-bottom:20px">Bu dokümana dayanan yanlışların. Doğrulama zinciri burada birleşiyor.</p>
+        ${ledger(questions, "Bu kaynağı kullanan soru yok.")}
+
+        ${doc.concepts.length ? `<h3 id="kavram">İlişkili kavramlar</h3>
+          <div class="pills">${doc.concepts.map(c => `<a class="pill" href="#/connections">${CONCEPTS[c] || c}</a>`).join("")}</div>` : ""}
+      </div>
+      ${toc("Bu kaynakta", [
+        { href: "#alinti", label: "İlgili paragraf" },
+        { href: "#sorular", label: `Sorular (${questions.length})` },
+        doc.concepts.length && { href: "#kavram", label: "Kavramlar" },
+      ])}
+    </div>`;
+}
+App.views.doc = renderDoc;
+App.router.add("doc", arg => renderDoc(arg));
+/* === /FEATURE === */
+
+/* === FEATURE: VERSION-HISTORY (kavram-keyed) === */
+/* Anthropic sürekli değişiyor (extended → adaptive thinking). Sürüm geçmişi
+   KAVRAMA bağlanır, tek soruya değil — M_BUILTIN'e dokunulmaz. Yalnızca resmî
+   dokümanla doğrulanmış geçişler; gerisini kullanıcı ekler. */
+const VERSIONS = {
+  thinking: {
+    title: "Extended → Adaptive thinking",
+    timeline: [
+      { date: "2025", label: "Extended thinking",
+        note: "Uzun akıl yürütme <code>thinking: { type: 'enabled', budget_tokens: N }</code> ile açılır (min 1024, &lt; max_tokens).",
+        docs: [["Extended thinking", "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"]] },
+      { date: "2026", label: "Adaptive thinking",
+        note: "En yeni modeller (Opus 4.7/4.8, Sonnet 5) <code>enabled</code>'ı reddeder: <code>thinking: { type: 'adaptive' }</code> + <code>output_config: { effort }</code>.",
+        docs: [["Steering thinking (adaptive)", "https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost"]] },
+    ],
+  },
+};
+
+function versionTimeline(key){
+  const v = VERSIONS[key]; if (!v) return "";
+  const steps = v.timeline.map(s => `
+    <div style="display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--rule)">
+      <span class="mono-code" style="flex:none;align-self:flex-start">${esc(s.date)}</span>
+      <div style="min-width:0">
+        <b>${esc(s.label)}</b>
+        <p class="small" style="margin:4px 0 8px">${s.note}</p>
+        ${(s.docs || []).map(d => docHTML(d[0], d[1])).join("")}
+      </div>
+    </div>`).join("");
+  return `<div class="reading">${steps}</div>`;
+}
+
+/* Soru sayfası için: sorunun kavramlarından sürüm geçmişi olanları göster. */
+function questionVersions(m){
+  const keys = (m.concepts || []).filter(c => VERSIONS[c]);
+  return keys.map(c => `<h3 id="surum-${c}">Sürüm geçmişi — ${esc(VERSIONS[c].title)}</h3>
+    <p class="small quiet reading" style="margin-bottom:4px">Bu kavram zamanla değişti. Sınavda hangi sürümün sorulduğuna dikkat et — eski sözdizimi tuzak olabilir.</p>
+    ${versionTimeline(c)}`).join("");
+}
+App.services.versions = { timeline: versionTimeline, forQuestion: questionVersions, has: k => !!VERSIONS[k] };
+/* === /FEATURE === */
+
+App.init();
 </script>
