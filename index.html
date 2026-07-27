@@ -232,6 +232,20 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .content { padding: 40px 32px 120px; }
 .wrap { max-width: 1120px; margin: 0 auto; }
 .reading { max-width: var(--measure); }
+.reading table {
+  width: 100%; border-collapse: collapse; margin: 18px 0 4px;
+  font-size: .82rem; display: block; overflow-x: auto;
+}
+.reading table thead th {
+  text-align: left; font-weight: 700; color: var(--ink-2);
+  font-size: .715rem; letter-spacing: .06em; text-transform: uppercase;
+  padding: 0 14px 8px; border-bottom: 1px solid var(--rule-2); white-space: nowrap;
+}
+.reading table td {
+  padding: 8px 14px; border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+.reading table tbody tr:last-child td { border-bottom: none; }
+.reading table td:first-child { font-weight: 650; }
 
 /* ---------------- Type ---------------- */
 
@@ -628,7 +642,7 @@ const CONCEPTS = {
 /* Çalışma notları — kullanıcının dokümantasyondan derlediği püf noktaları */
 const NOTES = [
   {
-    id: "prompt-caching", title: "Prompt Caching — Püf Noktaları", topic: "ctx", icon: "▤",
+    id: "prompt-caching", title: "Prompt Caching — Püf Noktaları", topic: "ctx", concept: "caching", icon: "▤",
     summary: "Etkili caching için en iyi pratikler ve senaryo bazlı optimizasyon — resmî dokümandan.",
     source: ["Anthropic Docs — Prompt caching", "https://platform.claude.com/docs/en/build-with-claude/prompt-caching"],
     sections: [
@@ -651,6 +665,63 @@ const NOTES = [
           <li><b>Agentic tool use:</b> her adımın yeni bir API çağrısı gerektirdiği, çok sayıda tool çağrısı ve yinelemeli kod değişikliği olan senaryolarda performansı artır.</li>
           <li><b>Longform içerikle konuşma:</b> kitap, makale, dokümantasyon, podcast transkriptleri — belgenin tamamını prompt'a gömüp kullanıcıların soru sormasına izin ver.</li>
         </ul>` },
+    ],
+  },
+  {
+    id: "mcp-primitives", title: "MCP Primitifleri — Parçalar ve Kim Kontrol Eder", topic: "tool", concept: "mcp", icon: "⚙",
+    summary: "MCP'nin tüm yapı taşları: sunucu/istemci primitifleri, taban protokol yardımcıları ve taşıma katmanı — kim sahip, kim kontrol eder, hangi metod. Resmî MCP dokümanından (spec 2025-11-25).",
+    source: ["Model Context Protocol — Concepts", "https://modelcontextprotocol.io/docs/learn/server-concepts"],
+    sections: [
+      { id: "sunucu", h: "Sunucu-tarafı primitifler (sunucu → istemciye sunar)", html: `
+        <ul>
+          <li><b>Tools</b> — <b>model kontrollü</b>: modelin aksiyon almak için <b>çağırdığı</b> çalıştırılabilir fonksiyonlar (DB yaz, API çağır, dosya değiştir). Alanlar: <code>name</code>, <code>title</code>, <code>description</code>, <code>inputSchema</code> (JSON Schema). Sonuç bir <code>content</code> dizisi döner. Metod: <code>tools/list</code>, <code>tools/call</code>. Bildirim: <code>notifications/tools/list_changed</code>.</li>
+          <li><b>Resources</b> — <b>uygulama kontrollü</b>: pasif, <b>salt-okunur</b> veri kaynakları (dosya içeriği, DB şeması, API dokümanı). Model çağırmaz — host nasıl kullanacağına karar verir. Alanlar: <code>uri</code> (örn. <code>file:///doc.md</code>), <code>name</code>, <code>mimeType</code>. Metod: <code>resources/list</code>, <code>resources/read</code>, <code>resources/subscribe</code>.</li>
+          <li><b>Resource Templates</b> — <b>uygulama kontrollü</b>: parametreli/dinamik resource URI'leri, örn. <code>travel://activities/{city}/{category}</code>. Alanlar: <code>uriTemplate</code>, <code>name</code>, <code>mimeType</code>. Metod: <code>resources/templates/list</code>. Parametre tamamlama (autocomplete) destekler.</li>
+          <li><b>Prompts</b> — <b>kullanıcı kontrollü</b>: önceden hazır, yeniden kullanılabilir, parametreli talimat şablonları (slash komut / komut paleti / buton olarak sunulur). Kullanıcının açıkça tetiklemesi gerekir. Alanlar: <code>name</code>, <code>description</code>, <code>arguments</code>. Metod: <code>prompts/list</code>, <code>prompts/get</code>.</li>
+        </ul>` },
+      { id: "istemci", h: "İstemci-tarafı primitifler (istemci → sunucuya sunar)", html: `
+        <ul>
+          <li><b>Sampling</b> — <b>kullanıcı/uygulama kontrollü (human-in-the-loop)</b>: sunucu, istemci üzerinden bir LLM tamamlaması ister — böylece sunucu model bağımsız kalır. Alanlar: <code>messages</code>, <code>modelPreferences</code> (<code>hints</code>, <code>costPriority</code>, <code>speedPriority</code>, <code>intelligencePriority</code>), <code>systemPrompt</code>, <code>maxTokens</code>. Metod: <code>sampling/createMessage</code>.</li>
+          <li><b>Elicitation</b> — <b>kullanıcı kontrollü</b>: sunucu, etkileşim sırasında kullanıcıdan <b>yapılandırılmış bilgi</b> ister (örn. rezervasyonu onayla). Alanlar: <code>message</code>, <code>requestedSchema</code>. Metod: <code>elicitation/create</code>. <b>Asla parola / API key istemez.</b></li>
+          <li><b>Roots</b> — <b>uygulama/kullanıcı kontrollü</b>: istemci, sunucuya hangi dosya sistemi dizinlerine odaklanacağını söyler. Yalnızca <code>file://</code> şeması. <b>Güvenlik sınırı DEĞİL</b> — koordinasyon/kapsam mekanizması (sunucu "SHOULD respect", "MUST enforce" değil). Bildirim: <code>roots/list_changed</code>.</li>
+          <li><b>Logging</b> — <b>uygulama kontrollü</b>: sunucu, hata ayıklama/izleme için istemciye log mesajları gönderir.</li>
+        </ul>` },
+      { id: "taban", h: "Taban protokol & yardımcılar", html: `
+        <ul>
+          <li><b>Lifecycle + capability negotiation</b>: <code>initialize</code> ile bağlantı kurulur (<code>protocolVersion</code>, <code>capabilities</code>, <code>clientInfo</code>/<code>serverInfo</code> değişimi), ardından <code>notifications/initialized</code>. Durumlu (stateful) protokol.</li>
+          <li><b>Notifications</b>: <code>id</code>'siz, yanıtsız JSON-RPC mesajları; gerçek-zamanlı güncelleme (örn. <code>*/list_changed</code>).</li>
+          <li><b>Progress</b> (uzun işlemler) · <b>Cancellation</b> (uçuştaki isteği iptal) · <b>Ping</b> (canlılık) · <b>Pagination</b> (<code>*/list</code> için).</li>
+          <li><b>Completion / Autocomplete</b>: prompt argümanları ve resource-template URI'leri için değer önerisi.</li>
+          <li><b>Configuration</b> · <b>Error reporting</b>.</li>
+          <li><b>Tasks</b> (<b>deneysel</b>): pahalı/çok-adımlı işler için dayanıklı (durable) async çalıştırma sarmalayıcısı — ertelenmiş sonuç ve durum takibi.</li>
+        </ul>` },
+      { id: "tasima", h: "Taşıma katmanı (transports)", html: `
+        <ul>
+          <li>Taban: <b>JSON-RPC 2.0</b>.</li>
+          <li><b>stdio</b>: standart giriş/çıkış akışları; <b>yerel</b>, aynı makine, tipik olarak <b>tek istemci</b>.</li>
+          <li><b>Streamable HTTP</b>: HTTP POST + opsiyonel SSE; <b>uzak</b> sunucular, <b>çok istemci</b>. Bearer token / API key / özel header; auth için <b>OAuth</b> önerilir.</li>
+        </ul>` },
+      { id: "puf", h: "Sınav püf noktaları — kim kontrol eder?", html: `
+        <ul>
+          <li>Kontrol modelini karıştırma: <b>Tools = model</b>, <b>Resources/Templates = uygulama</b>, <b>Prompts = kullanıcı</b>.</li>
+          <li>Taraf ayrımı: Tools/Resources/Templates/Prompts <b>sunucu</b>; Sampling/Elicitation/Roots/Logging <b>istemci</b>.</li>
+          <li><b>Resources pasif/salt-okunur</b> (bağlam sağlar) — <b>Tools aksiyon alır</b>. Sınav bunu ters çevirir.</li>
+          <li>TS SDK: <code>server.tool(ad, zodŞeması, async handler)</code>; handler <b>bir <code>content</code> dizisi döndürmek zorundadır</b> (bkz. ilgili yanlış e2q4). <code>addTool</code>/<code>register</code>/<code>createTool</code> uydurmadır.</li>
+          <li><b>Roots</b> bir güvenlik sınırı değildir; sadece <code>file://</code> kapsamıdır.</li>
+        </ul>
+        <table>
+          <thead><tr><th>Primitif</th><th>Taraf</th><th>Kontrol</th><th>Metod</th></tr></thead>
+          <tbody>
+            <tr><td>Tools</td><td>Sunucu</td><td>Model</td><td><code>tools/call</code></td></tr>
+            <tr><td>Resources</td><td>Sunucu</td><td>Uygulama</td><td><code>resources/read</code></td></tr>
+            <tr><td>Resource Templates</td><td>Sunucu</td><td>Uygulama</td><td><code>resources/templates/list</code></td></tr>
+            <tr><td>Prompts</td><td>Sunucu</td><td>Kullanıcı</td><td><code>prompts/get</code></td></tr>
+            <tr><td>Sampling</td><td>İstemci</td><td>Kullanıcı/App (HITL)</td><td><code>sampling/createMessage</code></td></tr>
+            <tr><td>Elicitation</td><td>İstemci</td><td>Kullanıcı</td><td><code>elicitation/create</code></td></tr>
+            <tr><td>Roots</td><td>İstemci</td><td>App/Kullanıcı</td><td><code>roots/list_changed</code></td></tr>
+            <tr><td>Logging</td><td>İstemci</td><td>Uygulama</td><td>(log msg)</td></tr>
+          </tbody>
+        </table>` },
     ],
   },
 ];
@@ -1394,7 +1465,11 @@ function renderDashboard(){
 
     <h3>Nereye çalışmalısın</h3>
     <p class="small quiet reading" style="margin-bottom:20px">Yanlış yoğunluğuna göre sıralı. Üstteki alan en çok tekrar isteyendir.</p>
-    <div class="ledger">${weakRows}</div>`;
+    <div class="ledger">${weakRows}</div>
+
+    <h3>Çalışma notları</h3>
+    <p class="small quiet reading" style="margin-bottom:20px">Dokümantasyondan derlenmiş püf noktaları — yanlışlarından bağımsız doğrudan çalış.</p>
+    <div class="ledger">${NOTES.map(noteCard).join("")}</div>`;
 }
 
 /* ============================================================
@@ -1430,8 +1505,9 @@ const TOPIC_REMEMBER = {
       <span class="node">Resources = VERİ</span><span class="arrow" aria-hidden="true">·</span>
       <span class="node">Prompts = ŞABLON</span>
     </div>
-    <p class="small quiet" style="margin:16px 0 0">Tools çalıştırılır (iki yönlü), Resources okunur (salt-okunur bağlam / canlı log),
-      Prompts hazır talimat şablonudur. Ayrıca: <b>işi sunucuda yap, modele temiz + minimal veri döndür.</b></p></div>`,
+    <p class="small quiet" style="margin:16px 0 12px">Tools çalıştırılır (iki yönlü), Resources okunur (salt-okunur bağlam / canlı log),
+      Prompts hazır talimat şablonudur. Ayrıca: <b>işi sunucuda yap, modele temiz + minimal veri döndür.</b></p>
+    <a class="pill" href="#/note/mcp-primitives">MCP primitifleri notunu aç →</a></div>`,
 
   pe: `<div class="remember">
     <span class="mlabel">Tool sonucu hangi rolle döner?</span>
@@ -1710,7 +1786,7 @@ function renderNotes(){
 function renderNote(id){
   const n = NOTES.find(x => x.id === id);
   if (!n) return renderNotes();
-  const rel = M.filter(m => m.topic === n.topic || (m.concepts || []).includes("caching"));
+  const rel = M.filter(m => m.topic === n.topic || (m.concepts || []).includes(n.concept));
 
   setCrumbs([{ t: "Notlar", h: "#/notes" }, { t: n.title }]);
 
