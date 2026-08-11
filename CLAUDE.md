@@ -22,6 +22,17 @@ Compare against the upstream blob sha for that path. If they differ, refresh the
 
 Practice-exam answer keys (Udemy or any other third-party course) are **not** a source of truth. They are inputs to be checked. When a practice exam's "correct" answer conflicts with a primary source, the primary source wins, and the conflict must be written down explicitly in the note rather than quietly resolved.
 
+### Every claim ships with a clickable path back to its source
+
+A citation the reader cannot follow is not a citation. Anything rendered in the app that asserts what the official documentation says — the `official` block on a mistake record, a note section, a `summary` line — must carry a link the reader can click to land on the passage it was derived from.
+
+Rules:
+
+- **Deep-link, don't page-link.** Use the section anchor, not the page root: `https://code.claude.com/docs/en/hooks#pretooluse`, not `.../hooks`. Anchors come from the page's own heading slugs — read them from the raw markdown (`curl -sL <page>.md`) rather than guessing.
+- **The link goes where the claim is**, inside the same visual block. In `index.html` the `official` callout renders `srcJump(m.docs)`, which uses `docs[0]` and appends "(ilgili bölüm)" when the URL has a fragment. Note sections use the same `.srcline` markup.
+- **No source, say so in the UI.** When a claim rests only on `exam-preparation-guide.md`, render the `.srcline none` variant naming the section and line range instead of a link. Never leave the claim looking documented when it is not.
+- **Verify anchors resolve.** A fragment that no longer matches a heading silently drops the reader at the top of the page — recheck when refreshing citations.
+
 ### How this applies in practice
 
 - Before writing an explanation, locate it in a source above. If it cannot be located, mark it `UNVERIFIED` and say which source was searched — do not paraphrase it as fact.

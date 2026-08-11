@@ -420,6 +420,21 @@ a.row:hover::before, a.row:focus-visible::before { opacity: 1; }
 .note.ok { border-color: var(--pine); background: var(--pine-wash); }
 .note.ok .mlabel { color: var(--pine); }
 
+/* Kaynağa atlama satırı — resmî açıklamanın altında, kutunun içinde. */
+.srcline {
+  margin: 14px 0 0; padding-top: 12px;
+  border-top: 1px solid var(--rule-2);
+  font-size: .82rem; line-height: 1.5;
+}
+.srcline a {
+  color: var(--garnet); text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.srcline a:hover { border-bottom-color: var(--garnet); }
+.note.warn .srcline a { color: var(--ochre); }
+.note.warn .srcline a:hover { border-bottom-color: var(--ochre); }
+.srcline.none { color: var(--ink-3); }
+
 /* ---------------- Flow / remember ---------------- */
 
 .remember { background: var(--surface-sunk); border-radius: var(--r-m); padding: 20px 22px; }
@@ -728,7 +743,7 @@ const NOTES = [
   {
     id: "plan-mode", title: "Plan Mode vs Doğrudan Yürütme — Karar Eşiği", topic: "cc", concept: "ccsec", icon: "⌘",
     summary: "Plan mode ne yapar, nasıl girilir/çıkılır ve hangi eşikte doğrudan yürütme kazanır. Resmî Claude Code dokümanından doğrulandı (12 Ağustos 2026).",
-    source: ["Claude Code Docs — Best practices", "https://code.claude.com/docs/en/best-practices"],
+    source: ["Claude Code Docs — Best practices, \"Explore first, then plan, then code\"", "https://code.claude.com/docs/en/best-practices#explore-first-then-plan-then-code"],
     sections: [
       { id: "nedir", h: "Plan mode ne yapar", html: `
         <ul>
@@ -745,7 +760,7 @@ const NOTES = [
           <li><b>Proje varsayılanı:</b> <code>.claude/settings.json</code> içinde <code>permissions.defaultMode: "plan"</code>. VS Code eklentisinin başlattığı oturumlarda bu ayar başlangıç modunu belirlemez — bunun yerine VS Code kullanıcı ayarında <code>claudeCode.initialPermissionMode</code> değerini <code>plan</code> yap.</li>
           <li><b>Planı düzenle:</b> <code>Ctrl+G</code> planı varsayılan metin editöründe açar; Claude devam etmeden önce elle değiştirebilirsin.</li>
         </ul>
-        <p class="small quiet">Kaynak: <i>Claude Code Docs — Choose a permission mode</i> · <code>code.claude.com/docs/en/permission-modes</code></p>` },
+        <p class="srcline"><a href="https://code.claude.com/docs/en/permission-modes#analyze-before-you-edit-with-plan-mode" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, "Analyze before you edit with plan mode" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
       { id: "karar", h: "Karar eşiği — sınavın kalbi", html: `
         <p>Resmî dokümanın kuralı tek cümleye iniyor: <b>diff'i tek cümlede tarif edebiliyorsan planı atla.</b></p>
         <table>
@@ -767,7 +782,7 @@ const NOTES = [
           <li><b>Extended / adaptive thinking = akıl yürütme derinliği.</b> Modelin bir istek içinde ne kadar düşüneceğini ölçekler.</li>
           <li>Birlikte kullanılabilirler, ama farklı problemleri çözerler. Ajan <b>tartışmadan editliyorsa</b> → plan mode. Analiz <b>sığ kalıyorsa</b> → thinking.</li>
         </ul>
-        <p class="small quiet">Kaynak: <code>exam-preparation-guide.md</code> §10 "Plan Mode vs Extended Thinking" — resmî dokümanla çelişmiyor, dokümanın izin-modu tanımıyla uyumlu.</p>` },
+        <p class="srcline none">Kaynak: <code>exam-preparation-guide.md</code> §10 "Plan Mode vs Extended Thinking" (repo kökü, satır 1278-1284) — resmî dokümanla çelişmiyor, dokümanın izin-modu tanımıyla uyumlu. Bu ayrım için ayrı bir doküman sayfası yok.</p>` },
       { id: "sinav", h: "Sınav refleksi", html: `
         <ul>
           <li><b>60+ dosyada logging kütüphanesi değişimi</b> (kullanım denetimi + kütüphane seçimi + kademeli geçiş) → <b>plan mode ile başla</b>. Çok dosya + belirsiz yaklaşım, eşiğin tam üstü.</li>
@@ -814,7 +829,8 @@ const NOTES = [
           <li><b>Önyargısız inceleme</b> → taze bağlam / ayrı oturum / review subagent. Bu basitlik değil <b>doğruluk</b> gereğidir: üreten oturum kendi gerekçesini taşıdığı için kendi kararını sorgulamaz.</li>
           <li><b>Bölünebilir büyük iş</b> (50 ticket denetimi) → önce öğe başına pass, sonra ayrı sentez pass'i. Tek dev prompt da, örnekleyip genelleme de yanlıştır.</li>
         </ul>
-        <p class="small quiet">Not: inceleme subagent'ı için doküman ayrıca uyarıyor — boşluk aramaya programlanmış bir gözden geçirici iş sağlamken bile bulgu üretir; yalnızca doğruluğu veya belirtilen gereksinimi etkileyen boşlukları raporlamasını iste. Kaynak: <i>Claude Code Docs — Best practices</i>.</p>` },
+        <p class="small quiet">Not: inceleme subagent'ı için doküman ayrıca uyarıyor — boşluk aramaya programlanmış bir gözden geçirici iş sağlamken bile bulgu üretir; yalnızca doğruluğu veya belirtilen gereksinimi etkileyen boşlukları raporlamasını iste.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/best-practices#add-an-adversarial-review-step" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, "Add an adversarial review step" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
     ],
   },
 ];
@@ -1225,7 +1241,7 @@ const M_BUILTIN = [
     correct: "<code>--output-format json</code> ile birlikte <code>--json-schema &lt;şema&gt;</code>",
     why: "Bu soruyu boş bıraktın. Ek olarak Udemy tarafında şıklar <code>#NAME?</code> diye render oluyor (kursun kendi tablo içe-aktarma hatası), yani şıkları okuyarak çözmek mümkün değil — yalnızca açıklamalardan çıkarılabiliyor. Bayrakları ezberle: <b>tek başına <code>-p</code> yapılandırılmış çıktı garanti etmez.</b>",
     official: "<code>-p / --print</code> etkileşimsiz yazdırma modunu açar. <code>--output-format</code> <code>text</code>, <code>json</code> ve <code>stream-json</code> değerlerini alır. <code>--json-schema</code> yalnızca print modunda çalışır ve ajan iş akışını tamamladıktan sonra verilen JSON Schema'ya uyan <b>doğrulanmış</b> çıktı döndürür; geçersiz şemada Claude Code hata ile çıkar.",
-    docs: [["Claude Code — CLI reference", "https://code.claude.com/docs/en/cli-reference"], ["Claude Code — Non-interactive mode", "https://code.claude.com/docs/en/headless"]],
+    docs: [["Claude Code — CLI reference", "https://code.claude.com/docs/en/cli-reference#cli-flags"], ["Claude Code — Non-interactive mode", "https://code.claude.com/docs/en/headless"]],
     related: ["e5q57"], verdict: "authoritative"
   },
   {
@@ -1235,7 +1251,7 @@ const M_BUILTIN = [
     correct: "Her isteğe atanan <code>custom_id</code> ile sonuçları kaynak belgelere geri eşle",
     why: "Sıra/indeks tabanlı eşleme refleksin var. Böyle bir \"sıralı indeks listesi\" endpoint'i yok ve sıra zaten garanti değil. Batch'te kimlik <b>senin verdiğin</b> <code>custom_id</code>'dir.",
     official: "Her batch isteği 1-64 karakterlik, <code>^[a-zA-Z0-9_-]{1,64}$</code> kalıbına uyan benzersiz bir <code>custom_id</code> taşır. Doküman açık: sonuçlar herhangi bir sırada dönebilir ve batch oluşturulurken kullanılan sırayla eşleşmeyebilir; sonuçları isteklerle doğru eşlemek için <b>daima</b> <code>custom_id</code> kullanılır.",
-    docs: [["Anthropic Docs — Batch processing", "https://platform.claude.com/en/docs/build-with-claude/batch-processing"]],
+    docs: [["Anthropic Docs — Batch processing", "https://platform.claude.com/en/docs/build-with-claude/batch-processing#retrieving-batch-results"]],
     related: ["e5q29"], verdict: "authoritative"
   },
   {
@@ -1245,7 +1261,7 @@ const M_BUILTIN = [
     correct: "Talimat hangi sorun kategorilerinin raporlanacağını veya atlanacağını tanımlamıyor; modelin elinde uygulanabilir bir filtre ölçütü yok",
     why: "\"Model bunu yapamaz\" tipi mutlak iddialara kayıyorsun. Sorun modelin yeteneği değil, <b>talimatın ölçütsüzlüğü</b>. \"Yüksek güvenli\" tanımsız bir sıfat; hangi kategori girer hangi çıkar yazılmadıkça filtre yoktur.",
     official: "Resmî rehber belirsiz istem yerine somut bağlam ister: hangi dosya, hangi senaryo, neyin \"düzeltilmiş\" sayılacağı. Belirsiz istemler yalnızca keşif aşamasında, yön değiştirmeyi göze aldığında işe yarar.",
-    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices"]],
+    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#provide-specific-context-in-your-prompts"]],
     related: ["e5q14", "e5q46"], verdict: "ok"
   },
   {
@@ -1265,7 +1281,7 @@ const M_BUILTIN = [
     correct: "Bulguları kaynak dosya dizinine göre filtrele; yalnızca güvenlik-kritik yollardaki bulguları insana yönlendir",
     why: "Modelin kendi beyan ettiği güven skoru <b>garanti değildir</b> — kalibre edilmemiş bir sayıya eşik uygulamak filtreleme değil, filtreleme taklidi. Dosya yolu deterministiktir ve doğrudan risk ile ilişkilidir.",
     official: "Ham güven skorları hem aşırı-güvene hem aşırı-eskalasyona davetiye çıkarır; tutarlı ajan davranışını <b>kalibre edilmiş eşikler</b> üretir. Resmî rehber ayrıca uyarıyor: boşluk aramaya programlanmış bir gözden geçirici, iş sağlamken bile bulgu üretir — bu yüzden yalnızca doğruluğu veya belirtilen gereksinimi etkileyen boşluklar istenmelidir.",
-    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices"]],
+    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#add-an-adversarial-review-step"]],
     related: ["e5q5", "e5q20"], verdict: "ok"
   },
   {
@@ -1275,7 +1291,7 @@ const M_BUILTIN = [
     correct: "Model üretim anındaki akıl yürütme bağlamını taşımaya devam eder, bu yüzden kendi önceki kararlarını sorgulama olasılığı düşer",
     why: "Mekanizmayı \"nezaket / uyumluluk\" diye açıklama refleksin var. Gerçek neden <b>bağlam taşıması</b>: aynı pencere, aynı gerekçe zinciri. Çözüm de buradan çıkar — taze bağlam.",
     official: "Taze bağlam kod incelemesini iyileştirir, çünkü Claude az önce yazdığı koda karşı önyargılı olmaz (Writer/Reviewer deseni, ayrı oturumlar). Gözden geçirici bir subagent yalnızca diff'i ve verdiğin ölçütleri görür — değişikliği üreten akıl yürütmeyi görmez, bu yüzden sonucu kendi başına değerlendirir.",
-    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices"], ["Claude Code — Subagents", "https://code.claude.com/docs/en/sub-agents"]],
+    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#run-multiple-claude-sessions"], ["Claude Code — Subagents", "https://code.claude.com/docs/en/sub-agents"]],
     related: ["e5q14", "e5q45"], verdict: "ok"
   },
   {
@@ -1294,7 +1310,7 @@ const M_BUILTIN = [
     correct: "Her MCP tool sunucusunun kendi implementasyonunu, tarihleri hep aynı formatta dönecek şekilde değiştir",
     why: "Bunu <a href='#/q/e5q66'>e5q66</a> ile karıştırma — ikisi çelişmiyor. Burada bozuk olan <b>tool sözleşmesi</b>; sözleşme kaynağında düzeltilir. Hook o bozuk sözleşmeyi yamalar ve yalnızca Claude'un gördüğünü değiştirir: araç zaten çalışmıştır, telemetri orijinal çıktıyı kaydetmiştir, aynı aracı kullanan diğer istemciler bozuk formatı almaya devam eder.",
     official: "<code>updatedToolOutput</code> yalnızca Claude'un gördüğünü değiştirir. Hook tetiklendiğinde araç çalışmış olur — yazılan dosyalar, çalıştırılan komutlar ve gönderilen ağ istekleri çoktan etkisini göstermiştir. OpenTelemetry araç span'leri ve analitik olayları da hook çalışmadan önceki orijinal çıktıyı yakalar.",
-    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks"]],
+    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks#posttooluse"]],
     related: ["e5q66"], verdict: "ok"
   },
   {
@@ -1333,7 +1349,7 @@ const M_BUILTIN = [
     correct: "Plan mode ile başlayıp kullanım desenlerini denetle ve göç stratejisini tasarla, sonra uygulama için doğrudan yürütmeye geç",
     why: "Doğru mekanizmayı seçtin ama <b>bırakmayı</b> bilmedin. Plan mode bir aşamadır, bir yaşam tarzı değil: onaylanmış plandan sonra düzenleme yapmak için moddan çıkmak gerekir. Resmî akış dört fazlı — Keşfet → Planla → Uygula → Commit.",
     official: "Plan mode Claude'un araştırıp değişiklik önermesini sağlar, uygulamasını değil; sen planı onaylayana kadar düzenlemeler bloklanır. Planı onaylamak plan mode'dan çıkarır ve oturumu seçtiğin izin moduna geçirir, böylece Claude düzenlemeye başlar. Planlama, yaklaşımdan emin olmadığında, değişiklik birden çok dosyaya dokunduğunda veya koda yabancı olduğunda en faydalıdır.",
-    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices"], ["Claude Code — Permission modes", "https://code.claude.com/docs/en/permission-modes"]],
+    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#explore-first-then-plan-then-code"], ["Claude Code — Permission modes", "https://code.claude.com/docs/en/permission-modes#analyze-before-you-edit-with-plan-mode"]],
     related: ["e5q57"], verdict: "ok"
   },
   {
@@ -1343,7 +1359,7 @@ const M_BUILTIN = [
     correct: "Doğrudan yürütme — iş iyi tanımlı, düzeltme tek dosyada net ve mimari planlama gerektirmiyor",
     why: "Modu doğru seçtin, sonra üstüne istenmemiş bir keşif katmanı ekledin. \"Başka nerede var?\" iyi bir mühendislik içgüdüsü ama <b>sorulan iş bu değil</b>; sınavda kapsam genişleten şık yanlış şıktır. Ölçüt net: diff'i tek cümlede tarif edebiliyorsan ek mekanizma yok.",
     official: "Kapsamın belli ve düzeltmenin küçük olduğu işlerde (yazım hatası, log satırı, değişken yeniden adlandırma) doğrudan yapılması istenir; plan mode faydalıdır ama ek yük getirir. Subagent'lar ise ana bağlamı dolduracak <b>geniş</b> keşif için vardır — kapsamı daraltılmamış araştırma yüzlerce dosya okutur.",
-    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices"], ["Claude Code — Subagents", "https://code.claude.com/docs/en/sub-agents"]],
+    docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#explore-first-then-plan-then-code"], ["Claude Code — Subagents", "https://code.claude.com/docs/en/sub-agents#use-subagents-for-investigation"]],
     related: ["e5q56", "e5q5"], verdict: "ok"
   },
   {
@@ -1353,7 +1369,7 @@ const M_BUILTIN = [
     correct: "(Kursun cevabı) Read ile dosyanın tamamını yükle, değişikliği uygula, Write ile tam güncellenmiş içeriği kaydet",
     why: "Senin şıkkın kesinlikle yanlış — bir araç kısıtı yüzünden proje yapısını değiştirmek en pahalı çözüm. Ama <b>kursun cevabı da resmî dokümanın önerdiği ilk çare değil.</b> Doküman iki hafif çareyi önce sayıyor; Read+Write bunlar mümkün değilse kalan yoldur. Sınavda Read+Write şıkkı verilmişse ve diğer ikisi yoksa onu işaretle, ama gerçek işte önce <code>replace_all</code> veya daha uzun bağlam dene.",
     official: "Edit tam dize değiştirme yapar: <code>old_string</code> dosyada <b>tam olarak bir kez</b> geçmelidir. Birden çok kez geçtiğinde Claude ya tek geçişi sabitlemeye yetecek kadar çevresel bağlam içeren daha uzun bir dize verir, ya da hepsini değiştirmek için <code>replace_all: true</code> ayarlar.",
-    docs: [["Claude Code — Tools reference", "https://code.claude.com/docs/en/tools-reference"]],
+    docs: [["Claude Code — Tools reference", "https://code.claude.com/docs/en/tools-reference#edit-tool-behavior"]],
     related: ["e5q57"], verdict: "conflict"
   },
   {
@@ -1363,7 +1379,7 @@ const M_BUILTIN = [
     correct: "<code>updatedToolOutput</code> — PostToolUse hook'unda hem yerleşik hem MCP araçları için çıktıyı değiştirir",
     why: "<code>systemMessage</code> kullanıcıya mesaj gösterir; <b>modelin gördüğü araç çıktısını değiştirmez</b>. Tuzak şık ayrıca <code>updatedMCPToolOutput</code> olabilir — o gerçek bir alan ama yalnızca MCP araçlarını kapsar, dolayısıyla \"her ikisi için tek hook\" şartını karşılamaz.",
     official: "<code>updatedToolOutput</code>: aracın çıktısını, Claude'a gönderilmeden önce verilen değerle değiştirir; değer aracın çıktı şekline uymak zorundadır. <code>updatedMCPToolOutput</code> ise yalnızca MCP araçları için çıktıyı değiştirir — doküman doğrudan şunu diyor: tüm araçlarda çalışan <code>updatedToolOutput</code> tercih edilmeli. Alan <code>PostToolUse</code> ve <code>PostToolUseFailure</code> olaylarında geçerlidir.",
-    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks"]],
+    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks#posttooluse"]],
     related: ["e5q26", "e5q68"], verdict: "authoritative"
   },
   {
@@ -1373,7 +1389,7 @@ const M_BUILTIN = [
     correct: "<code>permissionDecision: \"ask\"</code> — işlem otomatik yürütülmek yerine onay için kullanıcıya sunulur",
     why: "<code>deny</code> onay akışı değildir; çağrıyı <b>iptal eder</b>. Gerekçeye \"insana danış\" yazmak modele bir öneri iletir, iş akışına onay kapısı kurmaz — 600 USD'lik iade reddedilmiş olur, beklemeye alınmış değil. İnsan-döngüde onay tam olarak <code>ask</code>'in tanımı.",
     official: "PreToolUse hook'unda <code>permissionDecision</code> alanı <code>allow</code>, <code>deny</code>, <code>ask</code> ve <code>defer</code> değerlerini alır. <code>\"allow\"</code> izin istemini atlar, <code>\"deny\"</code> araç çağrısını engeller, <code>\"ask\"</code> kullanıcıdan onay ister, <code>\"defer\"</code> aracın sonradan sürdürülebilmesi için düzgünce çıkar. <code>permissionDecisionReason</code>, <code>allow</code> ve <code>ask</code>'te kullanıcıya gösterilir (Claude'a değil), <code>deny</code>'de Claude'a gösterilir.",
-    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks"]],
+    docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks#pretooluse"]],
     related: ["e5q66", "e5q24"], verdict: "authoritative"
   },
 ];
@@ -1575,6 +1591,18 @@ function docHTML(title, url){
     <span class="m"><span class="t">${esc(title)}</span><span class="u">${esc(host)}</span></span>
     <span class="x" aria-hidden="true">↗</span>
   </a>`;
+}
+
+/* Resmî açıklamanın dayandığı kaynağa doğrudan atlama satırı.
+   URL'de #fragment varsa doküman o bölümde açılır — iddia ile kaynak arasındaki
+   mesafe bir tıklama olmalı, "şu sayfada bir yerde" değil. */
+function srcJump(docs){
+  const d = (docs || [])[0];
+  if (!d) return `<p class="srcline none">Kaynak: bu çıkarım yalnızca <code>exam-preparation-guide.md</code> ile doğrulandı — çevrimiçi doküman bağlantısı yok.</p>`;
+  const anchored = /#/.test(d[1]);
+  return `<p class="srcline"><a href="${esc(d[1])}" target="_blank" rel="noopener noreferrer">
+    <span aria-hidden="true">❖</span> Kaynağa git — ${esc(d[0])}${anchored ? " (ilgili bölüm)" : ""} <span aria-hidden="true">↗</span>
+  </a></p>`;
 }
 
 /* ------------------------------------------------------------
@@ -1913,7 +1941,7 @@ function renderQuestion(id){
           tone: m.verdict === "conflict" ? "warn" : "acc",
           glyph: m.verdict === "conflict" ? "⚠" : "❖",
           label: m.verdict === "conflict" ? "Dikkat — kurs cevabı ≠ resmî doküman" : "Resmî dokümana göre",
-          body: `<p style="margin-bottom:0">${field(m, "official")}</p>`,
+          body: `<p style="margin-bottom:0">${field(m, "official")}</p>${srcJump(m.docs)}`,
         })}
 
         ${(m.docs || []).length ? `<h3 id="kaynak">Resmî kaynaklar</h3>
