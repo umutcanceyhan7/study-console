@@ -637,6 +637,7 @@ const CONCEPTS = {
   mcp: "MCP primitifleri",
   ccsec: "Claude Code güvenlik/config",
   thinking: "Extended / adaptive thinking",
+  simplicity: "En basit çözüm ilkesi",
 };
 
 /* Çalışma notları — kullanıcının dokümantasyondan derlediği püf noktaları */
@@ -722,6 +723,98 @@ const NOTES = [
             <tr><td>Logging</td><td>İstemci</td><td>Uygulama</td><td>(log msg)</td></tr>
           </tbody>
         </table>` },
+    ],
+  },
+  {
+    id: "plan-mode", title: "Plan Mode vs Doğrudan Yürütme — Karar Eşiği", topic: "cc", concept: "ccsec", icon: "⌘",
+    summary: "Plan mode ne yapar, nasıl girilir/çıkılır ve hangi eşikte doğrudan yürütme kazanır. Resmî Claude Code dokümanından doğrulandı (12 Ağustos 2026).",
+    source: ["Claude Code Docs — Best practices", "https://code.claude.com/docs/en/best-practices"],
+    sections: [
+      { id: "nedir", h: "Plan mode ne yapar", html: `
+        <ul>
+          <li>Claude <b>araştırır ve değişiklik önerir, uygulamaz</b>: dosya okur, keşif için shell komutu çalıştırır, plan yazar — kaynak kodu düzenlemez.</li>
+          <li>Sen planı <b>onaylayana kadar düzenlemeler bloklu</b> kalır. Tek istisna: <code>bypassPermissions</code> etkin başlatılmış oturumlar — orada plan mode'un blokları uygulanmaz, Claude yalnızca "planla, editleme" diye talimatlanır.</li>
+          <li>Durum çubuğu aktifken <code>⏸ plan mode on</code> gösterir.</li>
+          <li>Plan hazır olunca Claude nasıl devam edileceğini sorar. Onaylamak plan mode'dan <b>çıkarır</b> ve oturumu seçtiğin izin moduna geçirir. "No, keep planning" ile plan mode'da kalırsın.</li>
+        </ul>` },
+      { id: "giris-cikis", h: "Giriş, çıkış ve varsayılan yapma", html: `
+        <ul>
+          <li><b>Oturum içi:</b> <code>Shift+Tab</code> ile döngü — <code>default</code> → <code>acceptEdits</code> → <code>plan</code>. Onaylamadan çıkmak için tekrar <code>Shift+Tab</code>.</li>
+          <li><b>Tek prompt için:</b> istemin başına <code>/plan</code> öneki.</li>
+          <li><b>CLI'dan başlat:</b> <code>claude --permission-mode plan</code>.</li>
+          <li><b>Proje varsayılanı:</b> <code>.claude/settings.json</code> içinde <code>permissions.defaultMode: "plan"</code>. VS Code eklentisinin başlattığı oturumlarda bu ayar başlangıç modunu belirlemez — bunun yerine VS Code kullanıcı ayarında <code>claudeCode.initialPermissionMode</code> değerini <code>plan</code> yap.</li>
+          <li><b>Planı düzenle:</b> <code>Ctrl+G</code> planı varsayılan metin editöründe açar; Claude devam etmeden önce elle değiştirebilirsin.</li>
+        </ul>
+        <p class="small quiet">Kaynak: <i>Claude Code Docs — Choose a permission mode</i> · <code>code.claude.com/docs/en/permission-modes</code></p>` },
+      { id: "karar", h: "Karar eşiği — sınavın kalbi", html: `
+        <p>Resmî dokümanın kuralı tek cümleye iniyor: <b>diff'i tek cümlede tarif edebiliyorsan planı atla.</b></p>
+        <table>
+          <thead><tr><th>Doğrudan yürüt</th><th>Plan mode kullan</th></tr></thead>
+          <tbody>
+            <tr><td>Kapsam net <b>ve</b> düzeltme küçük</td><td>Yaklaşımdan emin değilsin</td></tr>
+            <tr><td>Typo, log satırı ekleme, değişken yeniden adlandırma</td><td>Değişiklik <b>birden çok dosyayı</b> değiştiriyor</td></tr>
+            <tr><td>Stack trace hedefi zaten gösteriyor</td><td>Değiştirilecek koda <b>yabancısın</b></td></tr>
+          </tbody>
+        </table>
+        <ul>
+          <li>Doküman açıkça uyarıyor: <b>plan mode faydalı ama ek yük getirir</b>. Küçük ve kapsamı belli işlerde doğrudan iste.</li>
+          <li>Ters yön de yanlış: geniş migration'da doğrudan yürütme <b>inceleme kapısını ve mimari planlamayı</b> kaybettirir.</li>
+          <li>Önerilen akış dört fazlı: <b>Keşfet → Planla → Uygula → Commit</b>. Keşif ve planlama, uygulamadan ayrılır ki yanlış problemi çözmeyesin.</li>
+        </ul>` },
+      { id: "thinking", h: "Plan mode ≠ extended thinking", html: `
+        <ul>
+          <li><b>Plan mode = iş akışı kontrolü.</b> Bir izin modudur; "düşünme"den "yapma"ya geçişi insan onayına bağlar.</li>
+          <li><b>Extended / adaptive thinking = akıl yürütme derinliği.</b> Modelin bir istek içinde ne kadar düşüneceğini ölçekler.</li>
+          <li>Birlikte kullanılabilirler, ama farklı problemleri çözerler. Ajan <b>tartışmadan editliyorsa</b> → plan mode. Analiz <b>sığ kalıyorsa</b> → thinking.</li>
+        </ul>
+        <p class="small quiet">Kaynak: <code>exam-preparation-guide.md</code> §10 "Plan Mode vs Extended Thinking" — resmî dokümanla çelişmiyor, dokümanın izin-modu tanımıyla uyumlu.</p>` },
+      { id: "sinav", h: "Sınav refleksi", html: `
+        <ul>
+          <li><b>60+ dosyada logging kütüphanesi değişimi</b> (kullanım denetimi + kütüphane seçimi + kademeli geçiş) → <b>plan mode ile başla</b>. Çok dosya + belirsiz yaklaşım, eşiğin tam üstü.</li>
+          <li><b>Tek fonksiyonda null girdi hatası, stack trace yeri gösteriyor</b> → <b>doğrudan yürütme</b>. "Aynı hata başka fonksiyonlarda var mı" diye Explore subagent eklemek sorulan işi genişletmektir; doküman bu durumda "doğrudan iste" diyor.</li>
+          <li>Şıklarda <code>Shift+Tab</code>, <code>/plan</code>, <code>--permission-mode plan</code> ve <code>permissions.defaultMode</code> hepsi <b>geçerli</b> giriş yollarıdır — biri "yanlış" diye elenmez.</li>
+        </ul>` },
+    ],
+  },
+  {
+    id: "simplest-first", title: "En Basit Çözüm İlkesi — Fazla Orkestrasyon Tuzağı", topic: "agent", concept: "simplicity", icon: "◈",
+    summary: "İki seçenek de işi görüyorsa az mekanizmalı olan kazanır. Anthropic'in kendi mühendislik yazısından doğrulandı (12 Ağustos 2026).",
+    source: ["Anthropic Engineering — Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"],
+    sections: [
+      { id: "ilke", h: "İlkenin resmî ifadesi", html: `
+        <ul>
+          <li>Anthropic'in tavsiyesi: <i>"finding the simplest solution possible, and only increasing complexity when needed"</i>.</li>
+          <li>Karmaşıklık bedava değil: ajanik sistemler <b>gecikme ve maliyeti</b> daha iyi görev performansına takas eder — bu takasın ne zaman mantıklı olduğunu değerlendirmen beklenir.</li>
+          <li>Karmaşıklık yalnızca <b>sonuçları ölçülebilir şekilde iyileştirdiğinde</b> eklenir.</li>
+          <li>Birçok uygulama için tek LLM çağrısını retrieval ve bağlam-içi örneklerle optimize etmek yeterlidir; çok adımlı ajanik sistem <b>basit çözümler yetersiz kaldığında</b> gelir.</li>
+        </ul>` },
+      { id: "desen", h: "Senin tekrarlayan hata desenin", html: `
+        <p>Set 1'deki yanlışların dördü aynı şekle sahip: <b>daha ağır makineyi seçtin.</b></p>
+        <table>
+          <thead><tr><th>Soru</th><th>Seçtiğin ağır yol</th><th>Doğru olan hafif yol</th></tr></thead>
+          <tbody>
+            <tr><td>Q5</td><td>Her entegrasyona custom MCP server yaz</td><td>Jira için hazır community server, custom yalnızca tescilli akış için</td></tr>
+            <tr><td>Q14</td><td>Model kendi güven skorunu üretsin, ona göre ele</td><td>Dosya yoluna göre deterministik yönlendirme</td></tr>
+            <tr><td>Q46</td><td>Anlatı metninden regex ile alıntı çıkar</td><td>Üretici ajan zaten yapılandırılmış döndürsün</td></tr>
+            <tr><td>Q57</td><td>Doğrudan yürütme + Explore subagent</td><td>Yalnızca doğrudan yürütme</td></tr>
+          </tbody>
+        </table>` },
+      { id: "test", h: "Eleme testi — şıkta 20 saniyede uygula", html: `
+        <ol>
+          <li><b>Bu mekanizma hangi somut hatayı önlüyor?</b> Adı konulabilir bir hata yoksa şık süstür, ele.</li>
+          <li><b>Daha alt katmanda çözülebilir mi?</b> Kaynakta, şemada veya tool sözleşmesinde çözülebilen şeyi üst katmanda (hook, post-processing, ekstra ajan) çözen şık yanlıştır.</li>
+          <li><b>Garanti mi gerekiyor?</b> Garanti gerekiyorsa kod/hook/izin kuralı; modelin kendi beyanı (self-reported confidence) garanti değildir.</li>
+          <li><b>Ek ajan/geçiş ne kaybettiriyor?</b> Her sınır bağlam kaybı ve gecikme ekler. Kazanç adı konmuyorsa sınır eklenmez.</li>
+        </ol>` },
+      { id: "istisna", h: "Karmaşıklığın haklı olduğu yerler", html: `
+        <p>Basitlik "her şeyi tek pass'te yap" demek değil. Ek yapı şu dört durumda <b>doğru</b> cevaptır:</p>
+        <ul>
+          <li><b>Geniş, çok dosyalı migration</b> → plan mode (inceleme kapısı kazandırır). Bkz. <a class="pill" href="#/note/plan-mode">Plan Mode notu</a>.</li>
+          <li><b>Ana bağlamı dolduracak geniş keşif</b> → subagent; keşif ayrı bağlam penceresinde kalır, geriye yalnızca bulgular döner.</li>
+          <li><b>Önyargısız inceleme</b> → taze bağlam / ayrı oturum / review subagent. Bu basitlik değil <b>doğruluk</b> gereğidir: üreten oturum kendi gerekçesini taşıdığı için kendi kararını sorgulamaz.</li>
+          <li><b>Bölünebilir büyük iş</b> (50 ticket denetimi) → önce öğe başına pass, sonra ayrı sentez pass'i. Tek dev prompt da, örnekleyip genelleme de yanlıştır.</li>
+        </ul>
+        <p class="small quiet">Not: inceleme subagent'ı için doküman ayrıca uyarıyor — boşluk aramaya programlanmış bir gözden geçirici iş sağlamken bile bulgu üretir; yalnızca doğruluğu veya belirtilen gereksinimi etkileyen boşlukları raporlamasını iste. Kaynak: <i>Claude Code Docs — Best practices</i>.</p>` },
     ],
   },
 ];
