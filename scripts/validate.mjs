@@ -192,6 +192,14 @@ if (js && errors.length === 0) {
         for (const s of n.sections ?? []) {
           if (!s.id || !s.h || !s.html) fail(`${at}: bölümde id/h/html eksik.`);
         }
+        // Zincirlenmiş sorular: kırık id sessizce kaybolur, kart hiç çizilmez.
+        for (const r of n.related ?? []) {
+          if (!r || typeof r !== "object" || !r.id || !r.why) {
+            fail(`${at}: related girdisi { id, why } olmalı.`);
+            continue;
+          }
+          if (!ids.has(r.id)) fail(`${at}: related '${r.id}' hiçbir kayda karşılık gelmiyor.`);
+        }
       }
 
       console.log(

@@ -653,6 +653,8 @@ const CONCEPTS = {
   ccsec: "Claude Code güvenlik/config",
   thinking: "Extended / adaptive thinking",
   simplicity: "En basit çözüm ilkesi",
+  delegation: "Koordinatör–alt ajan devri",
+  sessionstate: "Oturum durumu ve tazelik",
 };
 
 /* Çalışma notları — kullanıcının dokümantasyondan derlediği püf noktaları */
@@ -831,6 +833,280 @@ const NOTES = [
         </ul>
         <p class="small quiet">Not: inceleme subagent'ı için doküman ayrıca uyarıyor — boşluk aramaya programlanmış bir gözden geçirici iş sağlamken bile bulgu üretir; yalnızca doğruluğu veya belirtilen gereksinimi etkileyen boşlukları raporlamasını iste.</p>
         <p class="srcline"><a href="https://code.claude.com/docs/en/best-practices#add-an-adversarial-review-step" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, "Add an adversarial review step" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+    ],
+  },
+  {
+    id: "chain-vs-adaptive", title: "Prompt Chaining vs Adaptif Araştırma — Hangi Şekle Hangi Desen", topic: "agent", concept: "simplicity", icon: "◈",
+    summary: "Adımları önceden yazabiliyor musun? Tek soru iki deseni ayırıyor. Anthropic'in kendi mühendislik yazısıyla doğrulandı (16 Ağustos 2026); \"dynamic decomposition\" terimi yalnızca sınav rehberinde geçiyor — bölüm 2'deki uyarıya bak.",
+    source: ["Anthropic Engineering — Building effective agents, \"Workflow: Prompt chaining\"", "https://www.anthropic.com/engineering/building-effective-agents#workflow-prompt-chaining"],
+    related: [
+      { id: "e5q29", why: "50 bilet denetimi: heterojen ama <b>mekanik</b> iş. Adaptif araştırma değil, öğe-başına pass + ayrı sentez. Adımlar veriye bakmadan yazılabiliyordu." },
+      { id: "e5q45", why: "Adaptif akışta koordinatör her adımda karar veriyor ama <b>bağlam devretmiyor</b>. Sonraki adımın ihtiyacı olan bulgular prompt'a elle konmazsa desen çöker." },
+      { id: "e1q62", why: "Üç bağımsız arama = ne zincir ne araştırma; tek turda paralel tool use. \"Şekli\" yanlış okumanın klasik örneği." },
+      { id: "e5q57", why: "Sabit ve tek cümlelik iş üstüne keşif katmanı eklemek, zincirlenebilir işe adaptif araştırma giydirmektir." },
+      { id: "e5q14", why: "Bulgu triyajı: adaptif akışın çıktısını <b>deterministik</b> bir kapıya bağla. Model kendi güven skorunu üretirse adaptiflik denetimsiz kalır." },
+    ],
+    sections: [
+      { id: "tanim", h: "İki desenin resmî tanımı", html: `
+        <ul>
+          <li><b>Prompt chaining</b> — görevi <b>sabit</b> bir adım dizisine böler; her LLM çağrısı bir öncekinin çıktısını işler. Ara adımlara programatik <b>gate</b> (kontrol) konabilir; akış raydan çıkarsa orada durur.</li>
+          <li>Amacı açıkça bir takas: <b>gecikmeyi verip doğruluk almak</b> — her çağrıyı tek başına daha kolay bir işe indirger. Uygunluk şartı: görev "kolayca ve temiz biçimde <b>sabit</b> alt görevlere" ayrılabiliyor olmalı.</li>
+          <li><b>Adaptif araştırma</b> — sonraki adım ancak mevcut bulgudan sonra belli olur. Resmî yazının en yakın iki karşılığı: <b>orchestrator-workers</b> ("alt görevler önceden tanımlı değildir, girdiye göre orkestratör belirler") ve <b>autonomous agents</b> ("gereken adım sayısını öngörmenin zor veya imkânsız olduğu, sabit bir yolu <b>hard-code edemeyeceğin</b> açık uçlu problemler").</li>
+          <li>Bedeli de resmî: otonom akış <b>daha yüksek maliyet ve biriken hata</b> riski demek; sandbox'ta test ve guardrail öneriliyor.</li>
+        </ul>
+        <p class="srcline"><a href="https://www.anthropic.com/engineering/building-effective-agents#workflow-prompt-chaining" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Anthropic Engineering, "Workflow: Prompt chaining" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "terim", h: "Terim uyarısı — \"dynamic decomposition\" resmî bir ad değil", html: `
+        <p>Bu ayrımı ezberlerken tek gerçek tuzak terminolojide:</p>
+        <ul>
+          <li><b>Anthropic'in yazısında</b> desen listesi şudur: prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer + agents. <b>"Dynamic decomposition" diye bir başlık yok.</b></li>
+          <li><b>Sınav rehberi</b> ise "Dynamic decomposition" adında ayrı bir satır tutuyor: <i>"Investigation where each discovery changes the plan"</i>. Kapsam olarak orchestrator-workers ile autonomous agent arasına düşüyor.</li>
+          <li>Pratik sonuç: <b>şıkta hangi ad geçerse geçsin şekli oku.</b> "Adımlar bulguya göre değişiyor" diyen şık, adı ister dynamic decomposition ister orchestrator-workers ister agent loop olsun, aynı deseni tarif eder.</li>
+        </ul>
+        <p class="srcline none">Kaynak: <code>exam-preparation-guide.md</code> §8 "Agentic Patterns and Task Decomposition" (repo kökü, satır 1019-1025 desen tablosu, satır 1039 adaptif araştırma paragrafı, satır 1915-1918 özet). Resmî yazıyla <b>çelişmiyor</b> — resmî yazıda karşılığı olmayan bir <i>ad</i> kullanıyor; çelişki değil, terim farkı.</p>` },
+      { id: "karar", h: "Karar kuralı — tek soru", html: `
+        <p>Şıklara bakmadan önce senaryoya sor: <b>adım listesini veriyi görmeden yazabilir miyim?</b></p>
+        <table>
+          <thead><tr><th>Prompt chaining</th><th>Adaptif araştırma</th></tr></thead>
+          <tbody>
+            <tr><td>Adımlar <b>önceden</b> bilinir, her seferinde aynıdır</td><td>Sonraki adım <b>bir önceki bulguya</b> bağlıdır</td></tr>
+            <tr><td>Adım sayısı sabit ve bütçelenebilir</td><td>Adım sayısı öngörülemez — cap gerekir</td></tr>
+            <tr><td>Ara çıktı <b>gate</b>'lenebilir (şema/eşik kontrolü)</td><td>Ara çıktı hedefi değil <b>yönü</b> belirler</td></tr>
+            <tr><td>İş <b>mekanik</b> ve iyi tanımlı</td><td>İş <b>keşif</b> — hedef belli, yol belli değil</td></tr>
+            <tr><td>Yanlış uygulanırsa: gereksiz tool çağrısı yok, sığ analiz riski var</td><td>Yanlış uygulanırsa: koordinatör yükü boşa gider, çıktı tutarsızlaşır</td></tr>
+          </tbody>
+        </table>
+        <p>Üçüncü bir cevap her zaman masada: iş <b>bölünebilir ve tekdüze</b> ise ne zincir ne araştırma — <b>partition-then-parallel</b> (paralel subagent + sentez pass'i) doğrudur.</p>` },
+      { id: "ornek", h: "Kullanım senaryoları — yan yana", html: `
+        <table>
+          <thead><tr><th>Senaryo</th><th>Desen</th><th>Neden</th></tr></thead>
+          <tbody>
+            <tr><td>Pazarlama metni üret, sonra başka dile çevir</td><td>Chaining</td><td>İki sabit adım; ikincisi birincinin çıktısını işler <span class="quiet">(resmî örnek)</span></td></tr>
+            <tr><td>Önce taslak yaz → taslak ölçütleri karşılıyor mu kontrol et → belgeyi yaz</td><td>Chaining</td><td>Ortadaki adım tam bir <b>gate</b> <span class="quiet">(resmî örnek)</span></td></tr>
+            <tr><td>Üç aşamalı sabit inceleme: stil → güvenlik → dokümantasyon</td><td>Chaining</td><td>Aşamalar her PR'da aynı</td></tr>
+            <tr><td>Fatura itirazı: kimlik doğrula → faturayı çek → politikayı kontrol et → düzeltme öner</td><td>Chaining</td><td>Akış <b>her zaman</b> aynı sırayla koşuyor</td></tr>
+            <tr><td>Aralıklı (intermittent) backend hatasını ayıklama</td><td>Adaptif</td><td>Log mu, config mi, yerelde tekrar mı — ilk bulgu belirler</td></tr>
+            <tr><td>Güvenlik olayı triyajı: uyarıyı incele → log çek / SIEM sorgula / on-call'ı çağır</td><td>Adaptif</td><td>Dallanma uyarının içeriğine bağlı</td></tr>
+            <tr><td>Müşterinin sıra dışı hata raporunun kök nedeni · flaky testi daraltma</td><td>Adaptif</td><td>Önceden yazılmış checklist gerçek nedeni ıskalar</td></tr>
+            <tr><td>Kaç dosyanın değişeceği baştan bilinmeyen kod değişikliği</td><td>Adaptif <span class="quiet">(orchestrator-workers)</span></td><td>Alt görevler girdiye göre orkestratörce belirlenir <span class="quiet">(resmî örnek)</span></td></tr>
+            <tr><td>Çok kaynaklı arama: hangi kaynağın açılacağı bulguya bağlı</td><td>Adaptif</td><td>Resmî yazı bunu orchestrator-workers örneği olarak veriyor</td></tr>
+            <tr><td>40 sözleşmeyi aynı 12 madde için denetle</td><td><b>Hiçbiri</b> — partition-then-parallel</td><td>Bağımsız + tekdüze iş; adaptiflik boşa koordinasyon yükü</td></tr>
+          </tbody>
+        </table>
+        <p class="srcline"><a href="https://www.anthropic.com/engineering/building-effective-agents#workflow-orchestrator-workers" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Anthropic Engineering, "Workflow: Orchestrator-workers" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "maliyet", h: "Yanlış eşleşmenin iki yönlü bedeli", html: `
+        <ul>
+          <li><b>Araştırmaya zincir giydirirsen:</b> koordinatör eforu boşa gider ve analiz <b>sığ</b> kalır — sabit adımlar gerçek nedeni sormaz, listeyi baştan sona koşar.</li>
+          <li><b>Sabit işe adaptiflik giydirirsen:</b> gereksiz tool çağrıları ve <b>tutarsız çıktı</b> alırsın; her koşu farklı yol izlediği için sonuçlar karşılaştırılamaz.</li>
+          <li><b>Adaptif akışın kendi kontrolü:</b> plan öngörülemez olduğu için bütçelemesi zordur — açık <b>sonlandırma ölçütü</b> ve <b>adım tavanı</b> koy. Resmî yazının otonom ajanlar için dediğinin aynısı: maksimum yineleme gibi durdurma koşulları kontrolü korur.</li>
+          <li><b>Zincirin kendi kontrolü:</b> ara adımlara programatik gate koy. Gate yoksa zincir yanlış bir ara çıktıyı sonuna kadar taşır.</li>
+          <li>Her iki desende de alt ajan kullanıyorsan: <b>bağlam devralınmaz.</b> Sonraki adımın ihtiyacı olan her bulgu prompt'a açıkça yazılmalı — bkz. <a class="pill" href="#/q/e5q45">E5·Q45</a>.</li>
+        </ul>
+        <p class="srcline"><a href="https://www.anthropic.com/engineering/building-effective-agents#agents" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Anthropic Engineering, "Agents" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "perfile", h: "Zincirin kanonik kod-inceleme biçimi: dosya-başına pass + çapraz-dosya pass", html: `
+        <p>Sınav rehberinin prompt chaining için verdiği somut örnek tek bir kalıp: <b>her dosyayı tek tek analiz et, sonra ayrı bir çapraz-dosya entegrasyon pass'i koş.</b> Nedeni <b>dikkat seyrelmesi</b> (attention dilution) — 30 dosyayı tek istemde inceleten bir pass, hiçbirini derinlemesine incelemez.</p>
+        <ul>
+          <li><b>Faz 1 — yerel analiz:</b> dosya başına bir çağrı/alt ajan. Her biri yalnız kendi dosyasına bakar: null kontrolü, hata yönetimi, sınır koşulları. Bu faz <b>paralelleşir</b>, çünkü dosyalar birbirini beklemez.</li>
+          <li><b>Faz 2 — çapraz-dosya pass:</b> tek bir çağrı, tüm yerel bulguları alır ve <b>yalnız dosyalar arası</b> sorulara bakar: değişen imza çağıranları bozuyor mu, iki dosya aynı state'i tutarsız güncelliyor mu, sözleşme (contract) kayması var mı.</li>
+          <li>Faz 2'nin girdisi ham dosya içeriği değil, faz 1'in <b>yapılandırılmış çıktısıdır</b>. Ham içeriği tekrar taşımak zincirin maliyet avantajını yer.</li>
+          <li>Bu bir <b>zincir</b>dir, adaptif akış değil: adım listesi PR'ın içeriğine bakmadan yazılabilir. "Hangi dosya" değişir, "hangi adımlar" değişmez.</li>
+          <li>Resmî Claude Code dokümanı aynı kalıbı dynamic workflow örneği olarak veriyor: <i>"review every file changed in this PR ... then merge the per-file findings into one ranked summary"</i> — dosya başına bir inceleyici, ardından bulguları tek sıralı özete birleştiren tek ajan.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/workflows#review-every-changed-file-and-write-one-summary" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, "Review every changed file and write one summary" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "sinav", h: "Sınav refleksi", html: `
+        <ul>
+          <li>Senaryoda <b>"her seferinde", "standart akış", "aynı sıra"</b> geçiyorsa → chaining. <b>"duruma göre", "bulguya bağlı", "kaç adım süreceği belli değil"</b> geçiyorsa → adaptif.</li>
+          <li><b>Tekdüze + bağımsız + çok sayıda öğe</b> gördüğünde iki deseni de ele: doğru cevap partition-then-parallel'dir. Rehberin 8. senaryosu tam bunu test ediyor — "koordinatör her sözleşmeden sonra ne inceleyeceğine karar versin" şıkkı, mekanik işe araştırma yükü bindirdiği için yanlış.</li>
+          <li>"Madde başına bir sabit aşama, her aşama 40 sözleşmeyi işlesin" tipi şık <b>chaining'in yanlış uygulanışıdır</b>: aynı belgeleri 12 kez okur ve tek bir yargıyı aşamalara böler.</li>
+          <li>Adaptif deseni seçtikten sonra <b>ikinci soru gelir</b>: koordinatör bulguları alt ajana nasıl geçiriyor? Cevap her zaman "tam bulgular, prompt'un içinde".</li>
+          <li>Desen seçimi <a class="pill" href="#/note/simplest-first">En Basit Çözüm İlkesi</a> ile birlikte okunur: iki desen de işi görüyorsa <b>az mekanizmalı</b> olan, yani zincir kazanır.</li>
+        </ul>
+        <p class="srcline none">Kaynak: <code>exam-preparation-guide.md</code> §8, satır 1035-1039 (iki yönlü bedel) ve satır 2113-2120 + 2201 (Senaryo 8 ve çözümü).</p>` },
+    ],
+  },
+  {
+    id: "hook-vs-prompt", title: "Deterministik Zorlama vs Olasılıksal Yönlendirme", topic: "agent", concept: "determinism", icon: "◈",
+    summary: "Hook ve ön-koşul kapısı garanti verir; sistem istemi olasılık kaydırır. Resmî Claude Code / Agent SDK hook dokümanlarıyla doğrulandı (16 Ağustos 2026). Kritik nüans: her hook deterministik değildir.",
+    source: ["Claude Code Docs — Hooks reference, \"PreToolUse\"", "https://code.claude.com/docs/en/hooks#pretooluse"],
+    sections: [
+      { id: "ayrim", h: "Ayrımın özü — garanti mi, eğilim mi", html: `
+        <p>Sınav bu ayrımı iki ayrı görev ifadesinde ölçüyor (1.4 ve 1.5) ve ikisi de aynı cümleye dayanıyor: <b>deterministik uyum gerektiğinde, istem talimatlarının tek başına sıfır olmayan bir başarısızlık oranı vardır.</b></p>
+        <table>
+          <thead><tr><th></th><th>Programatik zorlama</th><th>İstem tabanlı yönlendirme</th></tr></thead>
+          <tbody>
+            <tr><td>Nerede yaşar</td><td>Hook, izin kuralı, tool'un sunucu tarafı kodu</td><td>System prompt, CLAUDE.md, <code>.claude/rules/</code>, skill metni</td></tr>
+            <tr><td>Ne verir</td><td><b>Garanti</b> — kod yolu, model kararına bağlı değil</td><td><b>Eğilim</b> — uyum olasılığını yükseltir</td></tr>
+            <tr><td>Başarısızlık modu</td><td>Yanlış yazılmış kural (test edilebilir, tekrarlanabilir)</td><td>Uzun bağlamda dikkat zayıflar, prompt injection ile eğilir</td></tr>
+            <tr><td>Ne zaman doğru</td><td>Kuralın <b>%100</b> tutması gerekiyorsa: kimlik doğrulama, para eşiği, yıkıcı komut</td><td>Yargı gerektiren, bağlama göre değişen davranış: üslup, öncelik, keşif stratejisi</td></tr>
+          </tbody>
+        </table>
+        <p>Kural: <b>bir davranışın ihlali para/veri/güvenlik maliyeti doğuruyorsa istem katmanında bırakma.</b> İstem, modelin yapmak <i>isteyeceğini</i> değiştirir; hook, yapabileceğini değiştirir.</p>
+        <p class="srcline none">Kaynak: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (repo kökü) s.7 — Task Statement 1.4 "Knowledge of" 1-2. madde ve Task Statement 1.5 "Knowledge of" 3. madde. Sınavın kendi ifadesi; resmî ürün dokümanı bu cümleyi bu sözcüklerle kurmuyor.</p>` },
+      { id: "mekanik", h: "Hook mekaniği — bloklama gerçekte nasıl oluyor", html: `
+        <ul>
+          <li><b>PreToolUse</b> tool çağrısı çalışmadan <b>önce</b> tetiklenir ve çağrıyı <b>bloklayabilir</b>. Karar alanı <code>hookSpecificOutput.permissionDecision</code>: <code>"allow"</code>, <code>"deny"</code>, <code>"ask"</code>, <code>"defer"</code>. Boş nesne (<code>{}</code>) döndürmek "karar yok" demektir; normal izin akışı işler.</li>
+          <li><b>Öncelik sırası nettir:</b> <code>deny</code> &gt; <code>defer</code> &gt; <code>ask</code> &gt; <code>allow</code>. Herhangi bir hook <code>deny</code> derse, diğerleri ne derse desin işlem bloklanır.</li>
+          <li><b>Çıkış kodu 2 = bloklayan hata.</b> Bloklayabilen olaylarda exit 2, JSON bassan da bloklar — JSON'daki <code>permissionDecision: "allow"</code> bile onu geçersiz kılamaz. Doküman bunu açıkça söylüyor: exit 2'nin bloğu, JSON'un ezemediği tek sonuçtur.</li>
+          <li><b>PostToolUse</b> sonucu <b>model görmeden önce</b> yakalar: <code>additionalContext</code> ile tool sonucuna bilgi ekler, <code>updatedToolOutput</code> ile çıktının kendisini değiştirir. Heterojen veri normalizasyonunun (Unix timestamp / ISO 8601 / sayısal durum kodu) yeri burasıdır — modele düzeltmesini söylemek yerine, modele ulaşan veriyi düzeltirsin.</li>
+          <li>Agent SDK'da hook'lar <b>callback fonksiyonlarıdır</b> (<code>options.hooks</code>); Claude Code'da ayrıca shell komutu, HTTP, MCP tool, prompt ve agent tipleri var. Mekanizma aynı, taşıyıcı farklı.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#exit-code-2" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, Hooks reference, "Exit code 2" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "kapi", h: "Ön-koşul kapısı (prerequisite gate) — sıralamayı istemle değil kodla dayatmak", html: `
+        <p>"Önce kimliği doğrula, sonra iadeyi işle" cümlesi bir <b>sıralama</b> kuralıdır ve sıralama kuralları istemde tutulduğunda kaçar. Programatik karşılığı: <b>ön-koşul tamamlanana kadar aşağı akış tool çağrısını blokla.</b></p>
+        <ul>
+          <li>Uygulama: <code>process_refund</code> üzerinde bir <b>PreToolUse</b> hook'u, oturum durumunda <code>get_customer</code>'ın doğrulanmış bir müşteri kimliği döndürdüğüne dair kayıt arar. Yoksa <code>deny</code> + gerekçe döner; model gerekçeyi görür ve doğru sırayı izler.</li>
+          <li>Aynı fikrin ikinci uygulaması <b>politika kapısı</b>: eşiği aşan işlemi (örn. 500 doları geçen iade) blokla ve <b>alternatif akışa yönlendir</b> (insana devir). Blok mesajı modelin göreceği tek gerçek, o yüzden gerekçe "ne yapmalı" bilgisini taşımalı.</li>
+          <li>Eşik <b>sunucu tarafında</b> tutulmalı. Tool arayüzünde modele "approved: true" gibi bir parametre bırakırsan kapıyı modele açtırmış olursun — kapı kalmaz.</li>
+          <li>Sıralamayı yalnızca istemle kurmak (A), ihlali sonradan tespit etmek (B) veya few-shot ile olasılığı yükseltmek (C) tipik yanlış şıklardır: A injection'a açık, B para çıktıktan sonra çalışır, C olasılık kaydırır — politika %100 tutmak zorundadır.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#pretooluse" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, Hooks reference, "PreToolUse" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "nuans", h: "Kritik nüans — her hook deterministik değildir", html: `
+        <p>"Hook = deterministik" ezberi resmî dokümanla tam örtüşmüyor. Claude Code iki hook tipini <b>modelle</b> çalıştırıyor:</p>
+        <ul>
+          <li><b><code>type: "prompt"</code></b> — hook girdisi ve senin promptun bir Claude modeline (varsayılan Haiku) gönderilir; model yapılandırılmış JSON kararı döner. Yani kararın kendisi <b>olasılıksaldır</b>.</li>
+          <li><b><code>type: "agent"</code></b> — tool erişimi olan agentic bir doğrulayıcı başlatır. Daha güçlü, aynı ölçüde olasılıksal.</li>
+          <li><b>Deterministik olanlar:</b> <code>command</code>, <code>http</code>, <code>mcp_tool</code> — ve Agent SDK'daki callback fonksiyonları. Garanti isteyen bir senaryoda doğru cevap bunlardır.</li>
+        </ul>
+        <p>Sınavda "hook kullan" demek yetmez; <b>hangi tip hook</b> sorusu ayrımı taşır. Bir para eşiğini prompt hook'una bağlamak, zorlamayı istem katmanına geri koymaktır — sadece daha pahalı biçimde.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#prompt-based-hooks" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, Hooks reference, "Prompt-based hooks" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "secim", h: "Dört mekanizma — hangisi hangi işe", html: `
+        <table>
+          <thead><tr><th>Mekanizma</th><th>Ne zaman yüklenir</th><th>Ne yapar</th><th>Kullan</th></tr></thead>
+          <tbody>
+            <tr><td><code>CLAUDE.md</code></td><td>Her oturum</td><td>Yumuşak yönlendirme</td><td>Her oturumda bilinmesi gereken proje gerçekleri</td></tr>
+            <tr><td><code>.claude/rules/</code></td><td>Her oturum ya da <code>paths:</code> eşleşince</td><td>Yumuşak yönlendirme</td><td>Alan/konu bazlı kurallar</td></tr>
+            <tr><td>Skills</td><td>Talep üzerine</td><td>Yapılandırılmış prosedür — yine yumuşak</td><td>Kasıtlı çağrılan çok adımlı iş akışı</td></tr>
+            <tr><td>Hooks</td><td>Yaşam döngüsü olayı</td><td><b>Sert zorlama</b></td><td>İzin/ret kuralı, zorunlu onay, formatlayıcı</td></tr>
+          </tbody>
+        </table>
+        <p>Ayırıcı soru tek: <b>model karar verse de vermese de çalışmak zorunda mı?</b> Evetse hook. Değilse bağlam.</p>
+        <p class="srcline none">Kaynak: <code>exam-preparation-guide.md</code> §10 "CLAUDE.md vs rules vs skills vs hooks" (repo kökü, satır 1387-1397). Resmî dokümanla çelişmiyor; dört mekanizmayı tek tabloda karşılaştıran ayrı bir doküman sayfası yok.</p>` },
+      { id: "sinav", h: "Sınav refleksi", html: `
+        <ul>
+          <li>Senaryoda <b>"garanti", "her zaman", "asla", "uyum (compliance)", "denetlenebilir"</b> geçiyorsa → programatik zorlama. <b>"tercihen", "genellikle", "yönlendir"</b> → istem katmanı.</li>
+          <li>"System prompt'a daha güçlü ifadeyle yaz" / "few-shot örnek ekle" / "kuralı büyük harfle tekrarla" şıkları, deterministik gereksinim varsa <b>hepsi yanlıştır</b> — hepsi aynı olasılıksal katmanda oynar.</li>
+          <li>"Sonradan tespit et ve logla" şıkkı zorlama değil <b>gözlemlemedir</b>; ihlal zaten gerçekleşmiştir.</li>
+          <li>Veri formatı uyumsuzluğu (farklı MCP tool'ları farklı zaman formatı döndürüyor) → çözüm modele "formatları normalize et" demek değil, <b>PostToolUse</b> ile modele ulaşmadan normalize etmektir.</li>
+          <li>Hook seçtikten sonra <b>hangi olay</b> sorusu gelir: engelleme <b>PreToolUse</b>, sonuç dönüştürme <b>PostToolUse</b>. Bu ikisini karıştırmak en sık kaybedilen puandır.</li>
+        </ul>` },
+    ],
+  },
+  {
+    id: "coordinator-prompt", title: "Koordinatör Prompt'u — Hedef ve Kalite Kriteri, Prosedür Değil", topic: "agent", concept: "delegation", icon: "◈",
+    summary: "Alt ajanın uyum sağlayabilmesi için adım adım prosedür değil hedef + kalite ölçütü verilir. Ama \"hedef odaklı\" ile \"belirsiz\" aynı şey değil — Anthropic'in çok-ajanlı araştırma yazısı bu sınırı çiziyor (16 Ağustos 2026).",
+    source: ["Anthropic Engineering — How we built our multi-agent research system", "https://www.anthropic.com/engineering/multi-agent-research-system#prompt-engineering-and-evaluations-for-research-agents"],
+    sections: [
+      { id: "ilke", h: "İlke ve gerekçesi", html: `
+        <ul>
+          <li>Sınav ifadesi: koordinatör promptları <b>araştırma hedeflerini ve kalite kriterlerini</b> belirtmeli, adım adım prosedürel talimatları değil — böylece alt ajan <b>uyum sağlayabilir</b>.</li>
+          <li>Gerekçe deseni taşıyor: alt ajan araştırma yaparken <b>ara sonuçları değerlendirir</b> ve sorgusunu ona göre daraltır. Prosedürel bir kilit ("şu üç aramayı bu sırayla yap") bu döngüyü öldürür; ajan bulguya rağmen listeyi koşar.</li>
+          <li>Rehberin aynı kuralı: <b>"Give goals and quality criteria, not brittle step-by-step search strings, when adaptability matters."</b> Kırılganlık vurgusu önemli — sabit arama dizeleri veri değişince sessizce boş döner.</li>
+          <li>Resmî yazının stratejik ifadesi: prompt stratejileri <b>katı kurallar yerine iyi sezgiler (heuristics)</b> aşılamaya odaklanır; iyi çok-ajanlı promptlar "katı talimatlar değil, iş bölümünü, problem çözme yaklaşımını ve efor bütçelerini tanımlayan <b>işbirliği çerçeveleridir</b>".</li>
+        </ul>` },
+      { id: "sinir", h: "Sınır — \"hedef odaklı\" belirsiz demek değil", html: `
+        <p>Bu maddenin en kolay yanlış anlaşılan tarafı. Aynı resmî yazı, <b>yetersiz</b> görev tarifinin somut zararını da ölçmüş:</p>
+        <ul>
+          <li>"Orkestratöre devretmeyi öğret" başlığı altında: her alt ajanın <b>bir amaca (objective), bir çıktı formatına, hangi tool ve kaynakları kullanacağına dair yönlendirmeye ve net görev sınırlarına</b> ihtiyacı vardır.</li>
+          <li>Ayrıntılı görev tarifi olmadan ajanlar <b>işi tekrar eder, boşluk bırakır veya gerekli bilgiyi bulamaz</b>.</li>
+          <li>Yaşanmış örnek: lead agent'a "yarı iletken kıtlığını araştır" gibi kısa talimatlar verilmesine izin verildiğinde, bir alt ajan 2021 otomotiv çip krizini incelerken <b>iki alt ajan aynı 2025 tedarik zinciri aramasını tekrarladı</b> — iş bölümü çöktü.</li>
+        </ul>
+        <p>Doğru okuma iki katmanlı: <b>"nasıl" kısıtlanmaz, "ne" ve "ne kadar iyi" kısıtlanır.</b></p>
+        <table>
+          <thead><tr><th>Prompt'ta <b>olmalı</b></th><th>Prompt'ta <b>olmamalı</b></th></tr></thead>
+          <tbody>
+            <tr><td>Amaç: hangi soruya cevap aranıyor</td><td>Kelimesi kelimesine arama dizeleri</td></tr>
+            <tr><td>Kapsam sınırı: hangi alt konu / kaynak tipi bu ajana ait</td><td>Sabit tool çağrı sırası</td></tr>
+            <tr><td>Kalite ölçütü: kaynak kalitesi, tarih, çelişki işaretleme</td><td>Sabit tur sayısı ("tam 3 arama yap")</td></tr>
+            <tr><td>Çıktı şekli: alan alan yapılandırılmış sonuç</td><td>Hangi sonucun "doğru" sayılacağının peşin kararı</td></tr>
+            <tr><td>Efor bütçesi: yaklaşık tool çağrısı aralığı</td><td>Serbest bırakılmış sınırsız keşif</td></tr>
+          </tbody>
+        </table>
+        <p class="srcline"><a href="https://www.anthropic.com/engineering/multi-agent-research-system#prompt-engineering-and-evaluations-for-research-agents" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Anthropic Engineering, "Prompt engineering and evaluations for research agents" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "efor", h: "Efor bütçesi — adaptifliğin maliyet freni", html: `
+        <p>Ajanlar bir göreve ne kadar efor harcayacağını kendi başına iyi kestiremiyor; Anthropic ölçekleme kurallarını <b>doğrudan prompta gömmüş</b>:</p>
+        <ul>
+          <li>Basit olgu bulma → <b>1 ajan, 3-10 tool çağrısı</b>.</li>
+          <li>Doğrudan karşılaştırma → <b>2-4 alt ajan, her biri 10-15 çağrı</b>.</li>
+          <li>Karmaşık araştırma → <b>10+ alt ajan</b>, sorumlulukları net bölünmüş.</li>
+        </ul>
+        <p>Bu kurallar olmadan gözlenen başarısızlık: basit sorgular için <b>50 alt ajan</b> açmak, var olmayan kaynağı sonsuza dek aramak, birbirini gereksiz güncellemeyle boğmak. Yani "hedef ver, prosedür verme" ilkesinin <b>eşlik eden kuralı</b> efor bütçesidir — ikisi birlikte yazılır.</p>
+        <p>Arama stratejisi için de aynı biçim: kural değil sezgi — <b>"önce geniş, sonra daralt"</b>. Ajanlar kendiliğinden aşırı uzun ve spesifik sorgular yazıp az sonuç alma eğiliminde.</p>` },
+      { id: "baglam", h: "Uyum sağlayabilmesi için önce bağlamı olmalı", html: `
+        <ul>
+          <li>Alt ajanın bağlam penceresi <b>sıfırdan</b> başlar. Ebeveynden geçen tek içerik <b>Agent tool'una verilen prompt dizesidir</b> — dosya yolları, hata mesajları, önceki kararlar oraya elle yazılmalı.</li>
+          <li>Alt ajan <b>almaz</b>: ebeveynin konuşma geçmişi, ebeveynin tool sonuçları, ebeveynin system prompt'u. <b>Alır</b>: kendi system prompt'u (<code>AgentDefinition.prompt</code>), Agent tool prompt'u, proje CLAUDE.md'si (settingSources ile), tool tanımları.</li>
+          <li>Sonuç: "hedef odaklı prompt" yazmak, <b>bulguları geçmemek</b> anlamına gelmez. Sentez ajanına arama sonuçlarını ve belge analizlerini <b>tam olarak</b> vermek zorundasın; aksi halde uyum sağlayacak bir şeyi olmaz.</li>
+          <li>Atıf korunacaksa içerik ile metaveriyi (kaynak URL'si, belge adı, sayfa) <b>yapılandırılmış</b> biçimde ayır. Düz prose özet, atıf zincirini kesen tipik hatadır.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/agent-sdk/subagents#what-subagents-inherit" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Agent SDK Docs, "What subagents inherit" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "catisma", h: "Kaynak çatışması — Task tool mu, Agent tool mu?", html: `
+        <ul>
+          <li><b>Sınav rehberi (PDF s.6, Task Statement 1.3):</b> alt ajan doğurma mekanizması <b>Task tool</b>'dur ve koordinatörün <code>allowedTools</code> listesinde <b>"Task"</b> bulunmalıdır.</li>
+          <li><b>Güncel resmî doküman:</b> Claude alt ajanları <b>Agent tool</b> üzerinden çağırır; izin istemi olmadan çalışması için <code>allowedTools</code> içinde <b><code>Agent</code></b> olmalıdır.</li>
+          <li><b>Çözüm:</b> davranış aynı, <b>ad değişmiş</b>. Sınavda "Task" şıkkı çıkarsa sınavın beklediği cevap odur; üretimde yazacağın kod <code>Agent</code> ister. Daron rehberi de bu belirsizliği kabul edip "tipik olarak <code>Task</code> ya da <code>Agent</code>" diyor.</li>
+          <li>Asıl test edilen fikir isimden bağımsız: <b>devretme mekanizmasının kendisi bir tool'dur.</b> Ebeveynin izin listesinde yoksa, alt ajan tanımların var olsa bile koordinatör hiçbir şeyi başlatamaz.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/agent-sdk/subagents#programmatic-definition-recommended" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Agent SDK Docs, "Programmatic definition" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "sinav", h: "Sınav refleksi", html: `
+        <ul>
+          <li>Koordinatör prompt'u soran şıklarda <b>kelimesi kelimesine arama dizesi</b>, <b>sabit tool sırası</b> veya <b>sabit tur sayısı</b> içeren seçenek yanlıştır — uyum kabiliyetini keser.</li>
+          <li>Ama <b>en kısa</b> şık da yanlıştır. "Konuyu araştır" tipi tek cümlelik devir, iş tekrarına ve kapsam boşluğuna yol açar. Doğru şık hedefi <b>ve</b> sınırı <b>ve</b> çıktı şeklini taşır.</li>
+          <li>Kapsamı bölerken ölçüt <b>çakışmayı en aza indirmek</b>: her ajana ayrı alt konu ya da ayrı kaynak tipi.</li>
+          <li>Paralel doğurma <b>tek bir koordinatör yanıtında birden çok Task/Agent çağrısı</b> yayımlamakla olur; ayrı turlara bölmek seri çalıştırır.</li>
+          <li>Sentez boşluk bulursa akış bitmez: koordinatör <b>hedefli sorgularla</b> arama/analiz ajanlarına yeniden devreder ve sentezi tekrar koşar. "Tek geçişli katı araştırma" tipik yanlış şıktır.</li>
+        </ul>` },
+    ],
+  },
+  {
+    id: "resume-stale", title: "Oturumu Devam Ettirme — Değişen Dosyalar ve Bayat Tool Sonuçları", topic: "ctx", concept: "sessionstate", icon: "▤",
+    summary: "Devam ettirilen oturum tool sonuçlarını da geri yükler; dosya diskte değiştiyse ajan bunu bilmez. Resmî Claude Code ve Agent SDK oturum dokümanlarıyla doğrulandı (16 Ağustos 2026).",
+    source: ["Claude Code Docs — Manage sessions, \"What a resumed session restores\"", "https://code.claude.com/docs/en/sessions#what-a-resumed-session-restores"],
+    sections: [
+      { id: "neden", h: "Sorunun kökü — oturum konuşmayı saklar, dosya sistemini değil", html: `
+        <ul>
+          <li>Resmî doküman: devam ettirilen bir oturum <b>tool çağrıları ve sonuçları dahil tüm konuşma geçmişini</b> geri yükler.</li>
+          <li>Agent SDK dokümanının uyarısı bunu tamamlıyor: <b>oturumlar konuşmayı kalıcı kılar, dosya sistemini değil.</b> Dosya durumunu geri almak isteyen <i>file checkpointing</i>'e bakmalı.</li>
+          <li>İkisi birleşince tehlikeli durum çıkar: bağlamdaki <code>Read</code> sonucu, dosyanın <b>okunduğu andaki</b> fotoğrafıdır. Sen o dosyayı değiştirdiysen, ajan hâlâ eski içeriği "gerçek" sanır ve ona dayanarak öneri üretir.</li>
+          <li>Fork da aynı sınıra tabi: fork <b>konuşma geçmişini</b> dallandırır, dosya sistemini değil. Fork'lanan ajan dosya yazarsa değişiklik gerçektir ve aynı dizindeki her oturum görür.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/agent-sdk/sessions#fork-to-explore-alternatives" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Agent SDK Docs, "Fork to explore alternatives" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "cozum", h: "Doğru davranış — neyin değiştiğini söyle, hedefli yeniden analiz iste", html: `
+        <p>Sınavın beklediği refleks: <b>kod değişikliklerinden sonra oturumu devam ettirirken, daha önce analiz edilmiş dosyalardaki değişiklikleri ajana bildir.</b> Bunun pratik karşılığı üç adım:</p>
+        <ul>
+          <li><b>Hangi dosyaların değiştiğini adlandır.</b> "Şunlar değişti: <code>auth/session.ts</code>, <code>api/refund.ts</code>" — belirsiz "bazı şeyler değişti" ifadesi işe yaramaz.</li>
+          <li><b>Yeniden okumayı iste.</b> Ajan kendiliğinden diski yoklamaz; bağlamındaki eski içerik ona yeterli görünür.</li>
+          <li><b>Kapsamı sınırla.</b> Tam yeniden keşif (baştan tüm codebase taraması) gereksizdir ve pahalıdır — değişen dosyalar ve onlara bağlı yerler yeter. Sınav bunu açıkça "tam yeniden keşif gerektirmeden hedefli yeniden analiz" diye ifade ediyor.</li>
+        </ul>
+        <p>Aynı bayatlama hook'lardan gelen bağlamda da var: Claude Code, <code>PostToolUse</code> / <code>UserPromptSubmit</code> gibi tur-içi olaylarda enjekte edilen metni transkripte kaydeder ve <code>--resume</code> ile devam ederken hook'u yeniden çalıştırmak yerine <b>kayıtlı metni tekrar oynatır</b>; timestamp veya commit SHA gibi değerler bayatlar. <code>SessionStart</code> hook'ları ise devam sırasında <b>yeniden çalışır</b> (<code>source</code> = <code>"resume"</code>, fork ise <code>"fork"</code>), yani tazeleme yapabilecek yer orasıdır.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#add-context-for-claude" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, Hooks reference, "Add context for Claude" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "esik", h: "Devam mı, temiz başlangıç mı — eşik", html: `
+        <table>
+          <thead><tr><th>Devam ettir (<code>--resume</code> / <code>resume</code>)</th><th>Yeni oturum + yapılandırılmış özet</th></tr></thead>
+          <tbody>
+            <tr><td>Önceki bağlamın <b>çoğu hâlâ geçerli</b></td><td>Önceki tool sonuçları <b>bayat</b></td></tr>
+            <tr><td>Dosyalar aradan değişmedi ya da değişenler bildirildi</td><td>Sistem durumu dışarıdan değişti (saatler geçti, kayıtlar güncellendi)</td></tr>
+            <tr><td>Akıl yürütme zinciri korunmalı</td><td>Geçmiş uzun ve büyük kısmı ilgisiz</td></tr>
+          </tbody>
+        </table>
+        <p>Rehberin gerekçesi neden "eski oturumu devam ettirip 'en güncel sonuçları tercih et' talimatı ekle" seçeneğinin yanlış olduğunu açıklıyor: <b>ajan talimata rağmen sık sık eski tool sonuçlarına başvurur</b>, özellikle eski sonuç yenisinden daha ayrıntılıysa. Geçmişten <code>tool_result</code> mesajlarını filtrelemek de kötüdür — önceki turlar göremediği veriye atıf yapar ve model kafası karışır. Tüm tool'ları baştan çağırtmak ise ilgisiz çağrıları da tekrarlar.</p>
+        <p>Yapılandırılmış özet, düz prose özetten üstündür: alanlar (bilinen kimlikler, tamamlanan adımlar, açık boşluklar, "taze sorgu gerekli" bayrağı) belirsizlik bırakmaz.</p>
+        <p class="srcline none">Kaynak: <code>exam-preparation-guide.md</code> §5 "Returning Users and Stale Data" (repo kökü, satır 737-757) ve §8 "State Persistence" (satır 1096-1115). PDF karşılığı: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> s.8, Task Statement 1.7.</p>` },
+      { id: "arac", h: "Araç seti — hangi bayrak neyi yapar", html: `
+        <ul>
+          <li><b>Adlandırılmış devam:</b> <code>--resume &lt;session-name&gt;</code> belirli bir önceki konuşmayı sürdürür. <code>--continue</code> ise dizindeki <b>en son</b> oturumu bulur, kimlik takibi gerektirmez.</li>
+          <li><b>SDK karşılığı:</b> <code>resume=&lt;session_id&gt;</code> (belirli oturum) ve <code>continue_conversation=True</code> / <code>continue: true</code> (en son oturum).</li>
+          <li><b>Fork:</b> <code>fork_session=True</code> / <code>forkSession: true</code> (CLI'da <code>--fork-session</code>) geçmişin <b>kopyasıyla</b> yeni bir oturum açar; orijinal kimlik ve geçmiş değişmez. Ortak bir analiz temelinden <b>ayrışan yaklaşımları</b> denemenin yolu budur — örn. iki farklı refactor stratejisini aynı codebase analizinden dallandırmak.</li>
+          <li><b>Uzun oturumda devam:</b> Pro/Max planlarında ~1 saatten uzun süre boşta kalmış ve 100.000 tokenı aşmış bir oturumu devam ettirirken Claude Code üç seçenek sunar: <b>özetten devam</b> (<code>/compact</code> çalışır, sonraki istekler özeti taşır), <b>tam oturumu olduğu gibi devam ettir</b>, ya da <b>bir daha sorma</b>. Prompt cache o noktada zaten süresi dolmuş olduğundan, hangisini seçersen seç sonraki istek geçmişi bir kez baştan işler.</li>
+          <li><b>Geri yüklenmeyenler:</b> <code>--mcp-config</code>, <code>--settings</code>, <code>--plugin-dir</code>, <code>--fallback-model</code> ve <code>--add-dir</code> ile eklenen dizinler devam ederken tekrar verilmeli. <code>plan</code> ve <code>bypassPermissions</code> izin modları hiçbir zaman geri yüklenmez.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/sessions#resume-a-session" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Claude Code Docs, "Resume a session" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "sinav", h: "Sınav refleksi", html: `
+        <ul>
+          <li>Senaryoda <b>"dün analiz etmişti, bu sabah kodu değiştirdim"</b> kalıbı varsa doğru cevap: oturumu devam ettir <b>ama değişen dosyaları adıyla bildir</b> ve hedefli yeniden analiz iste.</li>
+          <li><b>Tam yeniden keşif</b> şıkkı (baştan tüm codebase'i tarat) fazla maliyetlidir; <b>hiçbir şey söylemeden devam</b> şıkkı bayat bağlamla çalışır. Doğru cevap ikisinin arasındadır.</li>
+          <li>"Ajana 'her zaman en güncel dosya içeriğini kullan' talimatı ver" şıkkı istem katmanında oynar — <a class="pill" href="#/note/hook-vs-prompt">deterministik zorlama vs olasılıksal yönlendirme</a> ayrımının aynısı burada da geçerli.</li>
+          <li><b>Fork vs resume ayrımı:</b> "iki yaklaşımı karşılaştır" → fork. "Kaldığım yerden devam" → resume. Fork'un yeni bir oturum kimliği aldığını unutma.</li>
+          <li>Uzun süreli çok-ajanlı iş akışlarında transkript değil <b>yapılandırılmış manifest</b> saklanır (tamamlanan adımlar, belge durumları, açık boşluklar); devam ederken koordinatör yalnızca ilgili durumu her ajanın prompt'una enjekte eder.</li>
+        </ul>` },
     ],
   },
 ];
@@ -2068,7 +2344,15 @@ function renderNotes(){
 function renderNote(id){
   const n = NOTES.find(x => x.id === id);
   if (!n) return renderNotes();
-  const rel = M.filter(m => m.topic === n.topic || (m.concepts || []).includes(n.concept));
+  /* Zincirlenmiş sorular: notu yazarken elle seçilmiş kayıtlar, her biri kendi
+     "neden burada" satırıyla. Otomatik eşleşme (konu/kavram) bunları tekrar
+     etmesin diye aşağıda eleniyor. */
+  const chained = (n.related || [])
+    .map(r => ({ ...r, m: M.find(x => x.id === r.id) }))
+    .filter(r => r.m);
+  const chainedIds = new Set(chained.map(r => r.id));
+  const rel = M.filter(m => !chainedIds.has(m.id) &&
+    (m.topic === n.topic || (m.concepts || []).includes(n.concept)));
 
   setCrumbs([{ t: "Notlar", h: "#/notes" }, { t: n.title }]);
 
@@ -2085,7 +2369,18 @@ function renderNote(id){
         <h3 id="kaynak">Resmî kaynak</h3>
         <div class="reading">${docHTML(n.source[0], n.source[1])}</div>
 
-        ${rel.length ? `<h3 id="ilgili">Bu notla ilgili yanlışların</h3>
+        ${chained.length ? `<h3 id="zincir">Zincirlenmiş sorular</h3>
+          <p class="small quiet reading" style="margin-bottom:16px">Bu notun kararını doğrudan test eden yanlışların, seçilme gerekçesiyle. Sırayla oku.</p>
+          <div class="ledger">${chained.map(r => `<a class="row" href="#/q/${r.m.id}">
+            <div class="rtop">
+              <span class="tcode">${TOPIC_CODE[r.m.topic]}</span>
+              <b>E${r.m.exam}·Q${r.m.q}</b>
+              ${badge(TOPICS[r.m.topic].short)}
+            </div>
+            <div class="ra">${r.why}</div>
+          </a>`).join("")}</div>` : ""}
+
+        ${rel.length ? `<h3 id="ilgili">Bu notla ilgili diğer yanlışların</h3>
           <p class="small quiet reading" style="margin-bottom:16px">Aynı konuyu test eden sorular. Notu okuduktan sonra bunları tekrar et.</p>
           <div class="pills">${rel.map(r => `<a class="pill" href="#/q/${r.id}">
             <span class="tcode">${TOPIC_CODE[r.topic]}</span>E${r.exam}·Q${r.q}</a>`).join("")}</div>` : ""}
@@ -2093,6 +2388,7 @@ function renderNote(id){
       ${toc("Bu notta", [
         ...n.sections.map(s => ({ href: `#${s.id}`, label: s.h })),
         { href: "#kaynak", label: "Resmî kaynak" },
+        chained.length && { href: "#zincir", label: "Zincirlenmiş sorular" },
         rel.length && { href: "#ilgili", label: "İlgili yanlışlar" },
       ])}
     </div>`;
