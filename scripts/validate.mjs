@@ -26,6 +26,9 @@ const ALLOWED_DOC_HOSTS = new Set([
 
 const VALID_VERDICTS = new Set(["ok", "conflict", "dated", "authoritative", "unverified"]);
 
+/* Veri bloğundan doldurulur; banka denetimi konu anahtarlarını buradan okur. */
+let TOPIC_KEYS = null;
+
 const errors = [];
 const warnings = [];
 const fail = m => errors.push(m);
@@ -120,7 +123,7 @@ if (js && errors.length === 0) {
     try {
       const ctx = createContext({});
       D = new Script(
-        `(() => { ${dataSrc}\n return { TOPICS, CONCEPTS, NOTES, M_BUILTIN, EXAMS_BUILTIN }; })()`,
+        `(() => { ${dataSrc}\n return { TOPICS, DOMAINS, CONCEPTS, NOTES, USAGE, M_BUILTIN, EXAMS_BUILTIN }; })()`,
         { filename: "data" }
       ).runInContext(ctx, { timeout: 5000 });
     } catch (e) {
@@ -128,11 +131,14 @@ if (js && errors.length === 0) {
     }
 
     if (D) {
-      const { TOPICS, CONCEPTS, NOTES, M_BUILTIN, EXAMS_BUILTIN } = D;
+      const { TOPICS, DOMAINS, CONCEPTS, NOTES, USAGE, M_BUILTIN, EXAMS_BUILTIN } = D;
       const topicKeys = new Set(Object.keys(TOPICS));
+      TOPIC_KEYS = topicKeys;
       const conceptKeys = new Set(Object.keys(CONCEPTS));
+      const DOMAIN_KEYS = new Set(Object.keys(DOMAINS ?? {}));
 
       if (!topicKeys.size) fail("TOPICS boş.");
+      if (DOMAIN_KEYS.size !== 5) fail(`DOMAINS 5 alan içermeli, ${DOMAIN_KEYS.size} bulundu.`);
       if (!M_BUILTIN.length) fail("M_BUILTIN boş.");
 
       const ids = new Set();
@@ -188,6 +194,14 @@ if (js && errors.length === 0) {
       for (const n of NOTES) {
         const at = `NOTES[${n.id ?? "?"}]`;
         if (!topicKeys.has(n.topic)) fail(`${at}: bilinmeyen topic '${n.topic}'.`);
+        // Blueprint alanı: filtre ve rozet buna bağlı, eksikse sayfa patlar.
+        if (!DOMAIN_KEYS.has(String(n.domain))) fail(`${at}: geçersiz domain '${n.domain}'. 1-5 olmalı.`);
+        for (const t of n.tasks ?? []) {
+          if (!/^[1-5]\.\d+$/.test(t)) fail(`${at}: geçersiz task statement '${t}'. Örn. '1.6'.`);
+          if (t.split(".")[0] !== String(n.domain)) {
+            fail(`${at}: task '${t}' domain ${n.domain} ile uyuşmuyor.`);
+          }
+        }
         if (!Array.isArray(n.source) || n.source.length !== 2) fail(`${at}: source [başlık, url] olmalı.`);
         for (const s of n.sections ?? []) {
           if (!s.id || !s.h || !s.html) fail(`${at}: bölümde id/h/html eksik.`);
@@ -202,10 +216,146 @@ if (js && errors.length === 0) {
         }
       }
 
+      /* Kullanım kartları: doğru/yanlış sözdizimi tek yerde. Yanlış blok
+         eksikse kart amacını kaybeder — kontrast olmadan ezber yok. */
+      const usageIds = new Set();
+      for (const u of USAGE ?? []) {
+        const at = `USAGE[${u.id ?? "?"}]`;
+
+        for (const k of ["id", "title", "ask"]) {
+          if (!u[k]) fail(`${at}: '${k}' eksik.`);
+        }
+        if (usageIds.has(u.id)) fail(`${at}: yinelenen id.`);
+        usageIds.add(u.id);
+
+        if (!DOMAIN_KEYS.has(String(u.domain))) fail(`${at}: geçersiz domain '${u.domain}'. 1-5 olmalı.`);
+        // Çapraz domain referansına izin var (tool_choice hem 2.3 hem 4.3),
+        // ama en az biri kartın kendi domain'ine ait olmalı.
+        const tasks = u.tasks ?? [];
+        if (!tasks.length) fail(`${at}: en az bir task statement gerekli.`);
+        for (const t of tasks) {
+          if (!/^[1-5]\.\d+$/.test(t)) fail(`${at}: geçersiz task statement '${t}'. Örn. '2.3'.`);
+        }
+        if (tasks.length && !tasks.some(t => t.split(".")[0] === String(u.domain))) {
+          fail(`${at}: hiçbir task domain ${u.domain} ile uyuşmuyor.`);
+        }
+
+        if (!Array.isArray(u.good) || !u.good.length) fail(`${at}: en az bir 'good' örnek gerekli.`);
+        if (!Array.isArray(u.bad) || !u.bad.length) {
+          fail(`${at}: 'bad' örnek yok. Kartın işi doğruyu yanlışın yanına koymak.`);
+        }
+        for (const [key, list] of [["good", u.good], ["bad", u.bad]]) {
+          for (const s of list ?? []) {
+            if (!s.label || !s.code) fail(`${at}: '${key}' girdisinde label/code eksik.`);
+          }
+        }
+
+        // Kaynak zorunlu: iddia varsa tıklanabilir dayanağı da olmalı.
+        if (!Array.isArray(u.src) || !u.src.length) {
+          if (!u.pdf) fail(`${at}: ne doküman bağlantısı ne PDF atfı var.`);
+        }
+        for (const d of u.src ?? []) {
+          if (!Array.isArray(d) || d.length !== 2) { fail(`${at}: src girdisi [başlık, url] olmalı.`); continue; }
+          let host;
+          try { host = new URL(d[1]).host; } catch { fail(`${at}: geçersiz src URL '${d[1]}'.`); continue; }
+          if (!ALLOWED_DOC_HOSTS.has(host)) {
+            fail(`${at}: resmî olmayan kaynak '${host}'. Yalnızca Anthropic/MCP alan adları.`);
+          }
+        }
+      }
+
       console.log(
         `  veri: ${M_BUILTIN.length} yanlış · ${Object.keys(EXAMS_BUILTIN).length} sınav · ` +
-        `${topicKeys.size} konu · ${conceptKeys.size} kavram · ${NOTES.length} not`
+        `${topicKeys.size} konu · ${conceptKeys.size} kavram · ${NOTES.length} not · ` +
+        `${(USAGE ?? []).length} kullanım kartı`
       );
+    }
+  }
+}
+
+/* ---------- 7. Soru bankası bloğu ---------- */
+
+/* Banka şifreli gömülür (bkz. scripts/build-bank.mjs). Buradaki denetim
+   içeriği çözmez — parola yok. Kontrol edilen şey blob'un şekli ve en
+   önemlisi: düz metin bankanın kazara sızmamış olması. */
+
+{
+  const BEGIN = "/* BANK:BEGIN */";
+  const END = "/* BANK:END */";
+
+  const nBegin = html.split(BEGIN).length - 1;
+  const nEnd = html.split(END).length - 1;
+
+  if (nBegin !== 1 || nEnd !== 1) {
+    fail(`Banka işaretleri tam olarak birer kez geçmeli (BEGIN=${nBegin}, END=${nEnd}).`);
+  } else {
+    const body = html.slice(html.indexOf(BEGIN) + BEGIN.length, html.indexOf(END)).trim();
+
+    if (body === "const BANK_BLOB = null;") {
+      warn("Banka gömülü değil (placeholder). `node scripts/build-bank.mjs` çalıştırılmamış.");
+    } else {
+      const m = body.match(/^const BANK_BLOB = (\{[\s\S]*\});$/);
+      if (!m) {
+        fail("Banka bloğu beklenen `const BANK_BLOB = {…};` şeklinde değil.");
+      } else {
+        let blob;
+        try { blob = JSON.parse(m[1]); } catch (e) { fail(`Banka blob JSON değil: ${e.message}`); }
+
+        if (blob) {
+          if (blob.v !== 1) fail(`Banka şema sürümü 1 olmalı, '${blob.v}' bulundu.`);
+          if (blob.cipher !== "AES-GCM") fail(`Banka şifresi AES-GCM olmalı, '${blob.cipher}' bulundu.`);
+          if (!blob.kdf || blob.kdf.hash !== "SHA-256") fail("Banka KDF hash'i SHA-256 olmalı.");
+          if (!blob.kdf || blob.kdf.iter < 100000) fail(`PBKDF2 tur sayısı çok düşük (${blob.kdf?.iter}).`);
+          if (!Number.isInteger(blob.n) || blob.n < 1) fail(`Banka soru sayısı geçersiz: '${blob.n}'.`);
+
+          if (!/^[A-Za-z0-9+/]+=*$/.test(blob.d || "")) {
+            fail("Banka payload'ı geçerli base64 değil.");
+          } else {
+            const raw = Buffer.from(blob.d, "base64");
+            /* salt(16) + iv(12) + tag(16) = 44 bayt başlık, sonrası ciphertext. */
+            if (raw.length < 64) fail(`Banka payload'ı şüpheli derecede kısa (${raw.length} bayt).`);
+          }
+
+          const sum = Object.values(blob.topics || {}).reduce((a, b) => a + b, 0);
+          if (sum !== blob.n) fail(`Banka konu toplamı ${sum}, beyan edilen soru sayısı ${blob.n}.`);
+
+          if (TOPIC_KEYS) {
+            for (const k of Object.keys(blob.topics || {})) {
+              if (!TOPIC_KEYS.has(k)) fail(`Banka bilinmeyen konu anahtarı taşıyor: '${k}'.`);
+            }
+          }
+
+          console.log(`  banka: ${blob.n} soru · ${(Buffer.from(blob.d, "base64").length / 1024).toFixed(1)} KB şifreli · ` +
+            `${Object.entries(blob.topics).map(([k, v]) => `${k}=${v}`).join(" ")}`);
+        }
+      }
+    }
+  }
+
+  /* Sızıntı kanaryası. data/bank.json yalnızca yerelde var (gitignore'lu);
+     varsa gerçek soru metinlerinin index.html'de DÜZ olarak geçmediği
+     doğrulanır. CI'da dosya yok, o zaman bu kontrol atlanır — blob şekli
+     kontrolleri yine de çalışır. */
+  const BANK_JSON = "data/bank.json";
+  if (existsSync(BANK_JSON)) {
+    let bank = null;
+    try { bank = JSON.parse(readFileSync(BANK_JSON, "utf8")); }
+    catch (e) { warn(`${BANK_JSON} okunamadı: ${e.message}`); }
+
+    if (Array.isArray(bank) && bank.length) {
+      let leaked = 0;
+      /* Her sorudan bir imza parçası; hepsini taramak gereksiz, örneklem yeter. */
+      const step = Math.max(1, Math.floor(bank.length / 40));
+      for (let i = 0; i < bank.length; i += step) {
+        const q = bank[i];
+        const probe = String(q.question || "").replace(/<[^>]+>/g, "").trim().slice(0, 60);
+        if (probe.length >= 30 && html.includes(probe)) leaked++;
+      }
+      if (leaked) {
+        fail(`Düz metin banka sızıntısı: ${leaked} soru metni index.html'de şifresiz geçiyor.`);
+      } else {
+        console.log(`  sızıntı kontrolü: ${bank.length} sorunun örneklemi düz metin olarak bulunamadı ✓`);
+      }
     }
   }
 }

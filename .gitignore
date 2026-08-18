@@ -2,3 +2,7 @@
 node_modules/
 _site/
 *.log
+password.txt
+
+# Soru bankası — düz metin, kursa ait. Şifreli hâli index.html içinde.
+data/
