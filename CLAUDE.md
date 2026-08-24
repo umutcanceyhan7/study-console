@@ -60,8 +60,9 @@ Static single-page study console for CCA-F / CCAR-F certification prep, deployed
 
 ## Question bank (`#/bank`)
 
-370 questions from two platforms: 310 from the Udemy course (Practice Exams 1–3 + BONUS Set 1 +
-BONUS Set 2, exams 1/2/3/5/6) and 60 from CertSafari (exam 7).
+430 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
++ BONUS Set 2, exams 1/2/3/5/6), 60 from CertSafari (exam 7), and 60 from a second Udemy course
+("Claude Certified Architect Foundations - 6 Practice Exams", Practice Test 1, exam 8).
 Separate from `M_BUILTIN` in every way — do not merge them.
 The scrape-to-embed pipeline for both platforms is written down in `INGEST.md` — read it before
 adding another exam.
@@ -92,6 +93,18 @@ the bare Udemy names — still no inference. The blueprint `subdomain` string is
 reaches the bank (which renders with `innerHTML`). Every question carries an explanation for all
 four options; the UI already shows the correct option's and the picked option's.
 Counts (exam 7): agent 14 · cc 12 · pe 12 · ctx 12 · tool 10.
+
+**Second Udemy course (`exam: 8`, ids `bx8-<order>`).** Quiz 7570481, "Practice Test 1", 60 questions,
+scraped **entirely from the result DOM** — its `assessments` API revision serves 60 questions whose
+text matches the attempt on 0 of 60, so those questions no longer exist upstream and there are no
+real `aid`s to attach. Domains are still not inferred: this course's result page prints the blueprint
+domain per question in a `domain-pane` ("Domain 3: …"), the same naming CertSafari uses, so
+`SECTION_TO_TOPIC` already covers it. Per-option explanations come from the DOM's feedback panes.
+`source: "udemy-6exams"` marks the course. Counts (exam 8): agent 16 · cc 12 · pe 12 · tool 11 · ctx 9.
+
+**Do not re-ingest quiz 7599280.** A result link for that quiz is BONUS Set 2, already stored as
+exam 6: the 60 current API records match the stored `aid`s and correct letters 60/60, and a fresh
+attempt link scored the same 61/9 on the same 70 questions. Checked 2026-08-25.
 
 **Exam 6 was scraped from the result DOM, not the API.** The attempt (Deneme 2, 70 questions) predates
 the August 2026 `EXAMS v2` rewrite; the quiz's current API revision serves only 60. Questions 1–60

@@ -85,21 +85,26 @@ Adres: `https://www.certsafari.com/anthropic/claude-certified-architect-foundati
    ```bash
    bash data/certsafari/scrape.sh <resume-token> data/certsafari/q 90
    ```
-4. **Doğru/yanlış için user_id gerekir.** `POST /api/get-quiz {quiz_id, user_id}`
+4. **Denemeyi nerede bulursun.** `POST /api/get-quizzes` tamamlanmış denemeleri
+   döndürmüyor (boş dizi). Tek liste sertifika ana sayfasındaki "Quiz History"
+   bölümü; oradaki "View quiz results" linki `?resume=<token>&view=results`
+   taşır ve token doğrudan `quiz_id`'dir. İlerleme de aynı sayfada:
+   Coverage / Mastery / Performance.
+5. **Doğru/yanlış için user_id gerekir.** `POST /api/get-quiz {quiz_id, user_id}`
    → `data.question_attempts[]`: `question_id`, `response.selectedLetters`,
    `is_correct`. user_id kullanıcının kendi tarayıcısındaki
    `localStorage.certsafari_user_id` içinde; yanlış id `403` döner. Bu yüzden bu
    adım Claude-in-Chrome ile kullanıcının Chrome profilinde çalıştırıldı
    (yeni sekme aynı origin'in localStorage'ını görüyor).
-5. **Şık harfleri kanoniktir, ekrandaki sıra değil.** Sınav "Random Order"
+6. **Şık harfleri kanoniktir, ekrandaki sıra değil.** Sınav "Random Order"
    çalıştığı için ekranda gördüğün harf ile API'nin harfi tutmaz;
    `selectedLetters` ve `correct_answers` aynı (API) harf uzayındadır.
    `data/certsafari/attempt-*.json` bu eşlemeyi ve yanlışları saklar.
-6. **Açıklamalar şık başına geliyor.** `explanations[]` = A-D için ayrı metin.
+7. **Açıklamalar şık başına geliyor.** `explanations[]` = A-D için ayrı metin.
    Hepsi `feedbacks` dizisine sırayla yazılır, `explanation` doğru şıkkınkidir.
    Arayüz zaten doğru şıkkın ve işaretlediğin şıkkın açıklamasını gösteriyor
    (`index.html`, `optfb`).
-7. **Metin markdown.** Udemy HTML gönderiyordu, CertSafari `` `kod` `` ve
+8. **Metin markdown.** Udemy HTML gönderiyordu, CertSafari `` `kod` `` ve
    `**kalın**` gönderiyor. Banka `innerHTML` ile çizdiği için merge sırasında
    önce kaçırılır sonra `<code>`/`<b>`'ye çevrilir.
 
@@ -115,3 +120,53 @@ Diğer uçlar: `/api/questions`, `/api/quiz-question-lifecycle`,
 `/api/update-quiz-progress`, `/api/saved-questions`. Site Next.js; uç nokta
 gövdeleri `_next/static/chunks/app/[vendor]/quiz/[id]/page-*.js` içinde okunabilir
 — tahmin etmekten hızlı.
+
+## İkinci Udemy kursu (exam 8) — "6 Practice Exams"
+
+Kurs: `anthropic-claude-certified-architect-3-full-practice-exams`, quiz 7570481
+("Practice Test 1"), 60 soru. Deneme: 55 doğru.
+
+**Burada API işe yaramadı.** `assessments` uç noktası 60 kayıt döndü ve domain dağılımı
+denememizle birebir aynıydı (16/12/12/9/11), ama soru metinleri **60/60 tutmadı** —
+kurs bankayı yeniden yazmış, denememizdeki sorular upstream'de yok. O yüzden her şey
+sonuç sayfasının DOM'undan alındı. Kontrol şu tek satırla yapılır; sıfır çıkıyorsa
+DOM yoluna geç:
+
+```bash
+node -e 'const A=require("./data/exam8/assessments.json"),D=require("./data/exam8/attempt-dom.json");
+const n=s=>String(s).replace(/<[^>]*>/g," ").toLowerCase().replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ");
+const dom=n(D.map(d=>d.question+" "+d.answers.map(a=>a.body).join(" ")).join(" "));
+console.log("eşleşen:",A.filter(a=>dom.includes(n(a.prompt.question).slice(-70))).length,"/",A.length)'
+```
+
+**DOM'da ne nerede** (sonuç sayfası, `?expanded=<attemptId>`):
+
+| veri | seçici |
+|---|---|
+| soru panosu | `[data-purpose="question-result-header-status-label"]` → 12 seviyeye kadar yukarı, `answer-body` içeren ilk ata |
+| durum | aynı elemanın metni: `Doğru` / `Yanlış` |
+| **domain** | `[data-purpose="domain-pane"]` → son satır: `Domain 3: Claude Code Configuration & Workflows` |
+| soru gövdesi | panonun ilk `[data-purpose="safely-set-inner-html:rich-text-viewer:html"]` elemanı |
+| şık + açıklama | `[class*="result-pane--answer-result-pane"]` sarmalayıcısı: içinde `[data-purpose="answer"]` ve `[class*="answer-feedback"]` |
+| doğru şık | `answer` elemanının sınıfında `answer-correct` |
+| işaretlediğin şık | `answer` metninin ilk satırı `Cevabınız …` |
+
+Domain DOM'da yazılı olduğu için exam 6'daki gibi elle tablo gerekmedi. Id'ler sentetik:
+`x8-<sıra>` → `bx8-1`.
+
+**Büyük JSON'u tarayıcıdan çıkarmanın yolu.** `javascript_tool` dönüşü ~1-2 KB'de kesiliyor,
+280 KB'lık yanıt oradan geçmez. Çözüm: yerel bir alıcıya POST etmek. Node ile 4188'de
+dinleyen küçük bir sunucu (`Access-Control-Allow-Origin: *`) açılır, sayfadan
+`fetch("http://localhost:4188/", {method:"POST", body:JSON.stringify(veri)})` çağrılır,
+sunucu gövdeyi dosyaya yazıp kapanır. https sayfasından `http://localhost`'a istek
+Chrome'da geçiyor. Betik: `scratchpad/recv.mjs` deseni — depoya girmez, tek kullanımlık.
+
+```bash
+node recv.mjs data/exam8/attempt-dom.json   # tek POST bekler, yazar, çıkar
+node data/exam8/merge-into-raw.mjs
+BANK_PASSWORD="$(head -1 password.txt)" node scripts/build-bank.mjs && node scripts/validate.mjs
+```
+
+**Aynı sınavı iki kez ekleme.** Bir sonuç linki elde etmeden önce quiz id'sine bak:
+7599280 = BONUS Set 2 = zaten exam 6. Doğrulama ucuz — API'nin 60 `aid`'i ve doğru
+harfleri bankadakiyle karşılaştırılır; 60/60 tutuyorsa yeni bir şey yok.
