@@ -60,8 +60,11 @@ Static single-page study console for CCA-F / CCAR-F certification prep, deployed
 
 ## Question bank (`#/bank`)
 
-240 questions pulled from the Udemy course's own API (Practice Exams 1–3 + BONUS Set 1). Separate
-from `M_BUILTIN` in every way — do not merge them.
+370 questions from two platforms: 310 from the Udemy course (Practice Exams 1–3 + BONUS Set 1 +
+BONUS Set 2, exams 1/2/3/5/6) and 60 from CertSafari (exam 7).
+Separate from `M_BUILTIN` in every way — do not merge them.
+The scrape-to-embed pipeline for both platforms is written down in `INGEST.md` — read it before
+adding another exam.
 
 **Id namespace.** Bank ids are `b<udemyAssessmentId>`; mistake records are `e<exam>q<n>`. They must
 never collide. The course rewrote its entire bank in August 2026 (`EXAMS v2`), so `M_BUILTIN`'s
@@ -71,13 +74,51 @@ bank, and every quiz now serves exactly 60 questions where the old logs say 65/6
 per-question mapping between the two sets, and none should be invented. The only shared axis is
 `topic`.
 
-**Domain tags are not inferred.** They come from the API's own `section` field, mapped 1:1 to
-`TOPICS` in `scripts/build-bank.mjs`. Counts: agent 61 · tool 51 · cc 48 · pe 42 · ctx 38.
+**Domain tags are not inferred — with one recorded exception.** They come from the API's own
+`section` field, mapped 1:1 to `TOPICS` in `scripts/build-bank.mjs`. The exception is BONUS Set 2
+(`exam: 6`, quiz 7599280): that quiz's `section` field carries the *scenario* name ("Scenario 1 -
+Customer Support Resolution Agent"), not a blueprint domain, so there is nothing to map. Its 70
+domains are hand-assigned per question and written out literally in the `TOPIC` table in
+`data/exam6/merge-into-raw.mjs`; `build-bank.mjs` accepts a record-level `topic` only when `section`
+is absent, and refuses records that carry both. The scenario name survives in a `scenario` field.
+Counts (Udemy only): cc 77 · agent 76 · tool 59 · pe 49 · ctx 49.
+
+**CertSafari (`exam: 7`, ids `bcs-<questionId>`).** Free platform, no account — identity is an
+anonymous UUID in `localStorage.certsafari_user_id`. Domains come from the API's own `domain`
+field (`"Domain 3: Claude Code Configuration & Workflows"`), mapped in `SECTION_TO_TOPIC` alongside
+the bare Udemy names — still no inference. The blueprint `subdomain` string is kept per record, and
+`source: "certsafari"` marks the platform. Text arrives as markdown, not HTML, so
+`data/certsafari/merge-into-raw.mjs` escapes it and converts `` `code` ``/`**bold**` before it
+reaches the bank (which renders with `innerHTML`). Every question carries an explanation for all
+four options; the UI already shows the correct option's and the picked option's.
+Counts (exam 7): agent 14 · cc 12 · pe 12 · ctx 12 · tool 10.
+
+**Exam 6 was scraped from the result DOM, not the API.** The attempt (Deneme 2, 70 questions) predates
+the August 2026 `EXAMS v2` rewrite; the quiz's current API revision serves only 60. Questions 1–60
+matched their API records by question text and carry real `aid`s; 61–70 no longer exist upstream and
+get synthetic ids (`bx6-61` … `bx6-70`) plus an empty `explanation` — their per-option `feedbacks`
+came from the DOM and are intact.
 
 **Course explanations are not a source of truth.** They render inside a `.srcline none` block that
 says so, with no doc link attached. This is the same rule as everywhere else in this repo — a
 practice-exam answer key is an input to be checked, not an authority. If you verify one against a
 primary source, that belongs in a note or an `M_BUILTIN` record, not in the bank payload.
+
+**Verified so far (exam 7).** The seven questions missed on the 2026-08-25 CertSafari attempt were
+checked against primary docs: `custom_id` `^[a-zA-Z0-9_-]{1,64}$` ✓
+([batch-processing](https://platform.claude.com/docs/en/build-with-claude/batch-processing#prepare-and-create-your-batch)),
+`${VAR:-default}` expanding in `command`/`args`/`env`/`url`/`headers` ✓
+([mcp](https://code.claude.com/docs/en/mcp#environment-variable-expansion-in-mcp-json)), backticks
+keeping an `@path` literal ✓ and `.claude/rules/` recursive discovery ✓
+([memory](https://code.claude.com/docs/en/memory#import-additional-files),
+[#set-up-rules](https://code.claude.com/docs/en/memory#set-up-rules)).
+**One divergence:** exam 7 q60 keys "Write requires the file to have been read in this conversation"
+as flatly true. [tools-reference#write-tool-behavior](https://code.claude.com/docs/en/tools-reference#write-tool-behavior)
+says it depends on the model — Opus 4.6/Haiku 4.5 and older always require the read, newer models may
+overwrite an unread file under the read-before-edit conditions, and every model required it before
+v2.1.228. The keyed option is still the best of the four (Grep does **not** satisfy the requirement;
+viewing with Bash does), but the flat claim is stale. Checked 2026-08-25. All seven are now
+`M_BUILTIN` records (`e7q3` … `e7q60`), q60 carrying `verdict: "dated"`.
 
 **Encryption, and its limits.** The site is public and the content is a paid course's, so the bank
 ships as ciphertext, not behind a JS password check (which would hide nothing — view source). The

@@ -34,14 +34,23 @@ const END = "/* BANK:END */";
 const KDF_ITER = 210000;
 const KDF_HASH = "sha256";
 
-/* Udemy'nin `section` alanı → index.html'deki TOPICS anahtarı. */
+/* Platformun `section` alanı → index.html'deki TOPICS anahtarı.
+   Udemy alanı çıplak domain adını, CertSafari "Domain 3: ..." önekli hâlini
+   yazıyor; ikisi de burada eşlenir, hiçbiri tahmin edilmez. */
 const SECTION_TO_TOPIC = {
   "Agentic Architecture & Orchestration": "agent",
   "Tool Design & MCP Integration": "tool",
   "Claude Code Configuration & Workflows": "cc",
   "Prompt Engineering & Structured Output": "pe",
   "Context Management & Reliability": "ctx",
+  "Domain 1: Agentic Architecture & Orchestration": "agent",
+  "Domain 2: Tool Design & MCP Integration": "tool",
+  "Domain 3: Claude Code Configuration & Workflows": "cc",
+  "Domain 4: Prompt Engineering & Structured Output": "pe",
+  "Domain 5: Context Management & Reliability": "ctx",
 };
+
+const TOPIC_KEYS = new Set(Object.values(SECTION_TO_TOPIC));
 
 const die = m => { console.error(`✗ ${m}`); process.exit(1); };
 
@@ -55,8 +64,14 @@ if (!Array.isArray(raw) || !raw.length) die(`${RAW} boş veya dizi değil.`);
 const bank = raw.map((a, idx) => {
   const at = `kayıt#${idx} (aid ${a.aid})`;
 
-  const topic = SECTION_TO_TOPIC[a.section];
-  if (!topic) die(`${at}: bilinmeyen section '${a.section}'.`);
+  /* Domain normalde kursun `section` alanından gelir — tahmin yok. Tek istisna
+     BONUS Set 2 (exam 6): o quizde `section` blueprint domain'i değil senaryo
+     adını taşıyor, o yüzden domain kayıt başına elle atanmış hâlde `topic`
+     alanıyla gelir (bkz. data/exam6/merge-into-raw.mjs). İkisi birden olmaz. */
+  const topic = a.topic || SECTION_TO_TOPIC[a.section];
+  if (!topic) die(`${at}: bilinmeyen section '${a.section}' ve topic yok.`);
+  if (!TOPIC_KEYS.has(topic)) die(`${at}: geçersiz topic '${topic}'.`);
+  if (a.topic && a.section) die(`${at}: hem section hem topic var, hangisi geçerli belirsiz.`);
 
   if (a.type !== "multiple-choice") die(`${at}: beklenmeyen tip '${a.type}'.`);
   if (!Array.isArray(a.answers) || a.answers.length < 2) die(`${at}: şık yok.`);
@@ -84,6 +99,9 @@ const bank = raw.map((a, idx) => {
     exam: a.exam,
     q: a.q,
     topic,
+    ...(a.scenario ? { scenario: a.scenario } : {}),
+    ...(a.subdomain ? { subdomain: a.subdomain } : {}),
+    ...(a.source ? { source: a.source } : {}),
     question: clean(a.question),
     answers: a.answers.map(clean),
     correct,
