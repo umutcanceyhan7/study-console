@@ -133,6 +133,17 @@ v2.1.228. The keyed option is still the best of the four (Grep does **not** sati
 viewing with Bash does), but the flat claim is stale. Checked 2026-08-25. All seven are now
 `M_BUILTIN` records (`e7q3` … `e7q60`), q60 carrying `verdict: "dated"`.
 
+**Dropping questions.** Some bank questions are far off exam format or teach nothing; they are
+removed in two stages. Stage A is in the browser: the "Bu soruyu ele" button (drill, review card, or
+`X`) puts the id in `BSTORE.excluded` in `localStorage`, and the question leaves every pool and
+count immediately — one click on `#/bank` → "Elenenler" puts it back. Stage B is in the repo: the
+same screen's copy button emits the id list for `scripts/bank-excluded.json` (`ids`), and
+`build-bank.mjs` filters those ids out after normalize and before writing `data/bank.json`, so the
+questions never reach the ciphertext — gone on every device. `data/bank-raw.json` is **never**
+pruned: deleting an id from the exclusion file and rebuilding restores the question. An id in the
+file with no match in the bank fails the build rather than being ignored. Every Stage B rebuild
+changes the counts above — update them here in the same commit.
+
 **Encryption, and its limits.** The site is public and the content is a paid course's, so the bank
 ships as ciphertext, not behind a JS password check (which would hide nothing — view source). The
 build gzips the JSON, derives a key with PBKDF2-SHA256 (210k iterations), encrypts with AES-256-GCM,

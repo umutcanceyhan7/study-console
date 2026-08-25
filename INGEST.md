@@ -11,11 +11,17 @@ kaydına yazılır (bkz. CLAUDE.md).
 ## Ortak boru hattı
 
 ```
-<platform>  →  data/<kaynak>/*.json   (ham yakalama, gitignore)
-            →  data/bank-raw.json     (birleştirilmiş ham kayıtlar)
-            →  scripts/build-bank.mjs (normalize → gzip → AES-256-GCM → index.html)
+<platform>  →  data/<kaynak>/*.json        (ham yakalama, gitignore)
+            →  data/bank-raw.json          (birleştirilmiş ham kayıtlar)
+            →  scripts/bank-excluded.json  (elenen id'ler, commit'li)
+            →  scripts/build-bank.mjs      (normalize → eleme → gzip → AES-256-GCM → index.html)
             →  node scripts/validate.mjs
 ```
+
+Eleme ham veriyi budamaz, yalnızca çıktıdan düşürür: `bank-excluded.json` içindeki
+`ids` dizisinden bir id silinip yeniden derlenirse soru geri gelir. Liste `#/bank`
+ekranındaki "Elenenler" bölümünün kopyala butonundan üretilir. Bankada karşılığı
+olmayan bir id build'i düşürür — sessizce yutulmaz.
 
 `data/` tamamen gitignore. Depoya yalnızca `index.html` içindeki ciphertext girer.
 

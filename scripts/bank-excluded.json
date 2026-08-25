@@ -1,0 +1,4 @@
+{
+  "note": "Sınav formatından uzak ya da öğretici olmayan sorular. build-bank.mjs bunları bankadan tamamen çıkarır — ciphertext'e hiç girmezler. data/bank-raw.json kaynak olarak dokunulmadan durur; buradan bir id silinip yeniden derlenirse soru geri gelir. Liste #/bank ekranındaki 'Elenenler' bölümünün kopyala butonundan üretilir.",
+  "ids": []
+}

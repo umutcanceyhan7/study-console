@@ -8,7 +8,8 @@
  * şifrelenir. index.html'e yalnızca ciphertext girer, parola hiçbir yerde
  * durmaz. Yanlış parola GCM auth tag'ini tutturamaz, çözme başarısız olur.
  *
- * Akış:  data/bank-raw.json → normalize → data/bank.json
+ * Akış:  data/bank-raw.json → normalize → eleme (scripts/bank-excluded.json)
+ *                           → data/bank.json
  *                           → gzip → PBKDF2-SHA256 → AES-256-GCM → base64
  *                           → index.html içindeki BANK:BEGIN/END arası
  *
@@ -26,6 +27,7 @@ import { pbkdf2Sync, randomBytes, createCipheriv } from "node:crypto";
 const RAW = "data/bank-raw.json";
 const NORM = "data/bank.json";
 const HTML = "index.html";
+const EXCLUDED = "scripts/bank-excluded.json";
 
 const BEGIN = "/* BANK:BEGIN */";
 const END = "/* BANK:END */";
@@ -61,7 +63,7 @@ if (!existsSync(RAW)) die(`${RAW} yok. Önce bankayı tarayıcıdan çıkar.`);
 const raw = JSON.parse(readFileSync(RAW, "utf8"));
 if (!Array.isArray(raw) || !raw.length) die(`${RAW} boş veya dizi değil.`);
 
-const bank = raw.map((a, idx) => {
+let bank = raw.map((a, idx) => {
   const at = `kayıt#${idx} (aid ${a.aid})`;
 
   /* Domain normalde kursun `section` alanından gelir — tahmin yok. Tek istisna
@@ -112,6 +114,35 @@ const bank = raw.map((a, idx) => {
 
 const ids = new Set(bank.map(b => b.id));
 if (ids.size !== bank.length) die("banka içinde yinelenen id var.");
+
+/* ---------- 1b. Eleme ---------- */
+
+/* Elenen sorular ham dosyadan silinmez, yalnızca çıktıdan düşer: bir id'yi
+   listeden çıkarıp yeniden derlemek soruyu geri getirir. Filtre normalize'dan
+   sonra ve NORM yazımından önce — böylece data/bank.json, blob'un `n`/`topics`
+   alanları ve validate.mjs'in sızıntı kanaryası hep gönderilen kümeyi anlatır. */
+let dropped = 0;
+{
+  let cfg = { ids: [] };
+  if (existsSync(EXCLUDED)) {
+    try { cfg = JSON.parse(readFileSync(EXCLUDED, "utf8")); }
+    catch (e) { die(`${EXCLUDED} okunamadı: ${e.message}`); }
+  }
+  const list = Array.isArray(cfg) ? cfg : cfg.ids;
+  if (!Array.isArray(list)) die(`${EXCLUDED} içinde \`ids\` dizisi yok.`);
+
+  /* Bankada karşılığı olmayan id sessizce yutulmaz: ya yazım hatasıdır ya da
+     ham veriden düşmüş bir kayıttır, ikisi de görülmeli. */
+  const unknown = list.filter(id => !ids.has(id));
+  if (unknown.length) die(`${EXCLUDED}: bankada olmayan id: ${unknown.join(", ")}`);
+
+  if (list.length) {
+    const excluded = new Set(list);
+    bank = bank.filter(b => !excluded.has(b.id));
+    dropped = excluded.size;
+  }
+}
+if (!bank.length) die("eleme sonrası banka boş kaldı.");
 
 const topics = {};
 for (const b of bank) topics[b.topic] = (topics[b.topic] || 0) + 1;
@@ -181,7 +212,7 @@ writeFileSync(HTML, html);
 /* ---------- Rapor ---------- */
 
 const kb = n => (n / 1024).toFixed(1) + " KB";
-console.log(`✓ ${bank.length} soru gömüldü`);
+console.log(`✓ ${bank.length} soru gömüldü${dropped ? ` (${dropped} elendi, bkz. ${EXCLUDED})` : ""}`);
 console.log(`  konu dağılımı: ${Object.entries(topics).map(([k, v]) => `${k}=${v}`).join(" · ")}`);
 console.log(`  düz metin ${kb(plain.length)} → gzip ${kb(packed.length)} → base64 ${kb(payload.length)}`);
 console.log(`  ${HTML}: ${kb(html.length)}`);

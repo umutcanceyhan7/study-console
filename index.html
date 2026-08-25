@@ -6353,7 +6353,8 @@ App.router.addNav("Çalışma", { glyph: "▣", label: "Kartlar", hash: "cards",
 /* === /FEATURE === */
 
 /* === FEATURE: SORU BANKASI (#/bank · #/drill · #/review) === */
-/* 310 soru, 5 pratik sınavdan (Practice Exam 1-3 + BONUS Set 1 ve Set 2).
+/* 430 soru: 310 birinci Udemy kursundan (Practice Exam 1-3 + BONUS Set 1 ve
+   Set 2), 60 CertSafari'den, 60 ikinci Udemy kursundan.
    Domain etiketi kursun kendi `section` alanından geliyor — tahmin yok. Tek
    istisna BONUS Set 2 (exam 6): o quizde `section` domain değil senaryo adını
    taşıyor, domain soru soru elle atandı ve tablo data/exam6/merge-into-raw.mjs
@@ -6365,6 +6366,10 @@ App.router.addNav("Çalışma", { glyph: "▣", label: "Kartlar", hash: "cards",
    Kurs Ağustos 2026'da bankayı baştan yazdı (EXAMS v2), o yüzden M_BUILTIN'in
    `e5q66` gibi id'leriyle bu havuzun soruları ÇAKIŞMAZ ve eşleşmez. Banka
    kendi ad alanını kullanır: `b<udemyAssessmentId>`.
+
+   Eleme: kötü/format dışı sorular iki aşamada düşer. A aşaması burada —
+   BSTORE.excluded, yerel, tek tıkla geri alınır. B aşaması repoda:
+   scripts/bank-excluded.json + yeniden derleme, soru ciphertext'ten çıkar.
 
    Şifreleme: site herkese açık, içerik ise ücretli kursun. Bir JS parola
    koşulu içeriği gizlemez (kaynağı görüntüle yeter), o yüzden gömülen şey
@@ -6384,7 +6389,7 @@ let BANK = null;           /* çözülmüş sorular; kilit açılana kadar null 
 let bankBusy = false;
 
 function bankLoadStore(){
-  const empty = { attempts: {}, flagged: [], sessions: {} };
+  const empty = { attempts: {}, flagged: [], excluded: [], sessions: {} };
   try { return Object.assign(empty, JSON.parse(localStorage.getItem(BANK_KEY)) || {}); }
   catch (e) { return empty; }
 }
@@ -6426,6 +6431,7 @@ async function bankTryUnlock(pw, opts){
   if (prev) prev.innerHTML = "";
   try {
     BANK = await bankDecrypt(pw);
+    bankPruneExcluded();
     if (o.remember) localStorage.setItem(BANK_PW_KEY, pw);
     bankBusy = false;
     App.router.refresh();
@@ -6460,10 +6466,24 @@ function bankLock(){
 
 function bankAll(){ return BANK || []; }
 function bankById(id){ return bankAll().find(b => b.id === id); }
-function bankInTopic(t){ return bankAll().filter(b => b.topic === t); }
+function bankInTopic(t){ return bankActive().filter(b => b.topic === t); }
 function bankAttempts(id){ return BSTORE.attempts[id] || []; }
 function bankLastAttempt(id){ const a = bankAttempts(id); return a.length ? a[a.length - 1] : null; }
 function bankFlagged(id){ return BSTORE.flagged.indexOf(id) >= 0; }
+function bankExcluded(id){ return BSTORE.excluded.indexOf(id) >= 0; }
+
+/* Elenen soru `bankAll()` içinde kalmaya devam eder — "Elenenler" listesinin
+   metnini gösterebilmesi için `bankById` onu çözebilmeli. Çözmeye, havuza ve
+   sayıma giren küme her yerde `bankActive()`. */
+function bankActive(){ return bankAll().filter(b => !bankExcluded(b.id)); }
+
+/* Soru metni HTML olarak saklanıyor; düz metni etiketleri sökerek değil
+   tarayıcıya çözdürerek alıyoruz, yoksa &#x27; gibi entity'ler ham görünür. */
+function bankStem(q){
+  const tmp = document.createElement("div");
+  tmp.innerHTML = q.question;
+  return (tmp.textContent || "").replace(/\s+/g, " ").trim();
+}
 
 function bankTopicStats(t){
   const qs = bankInTopic(t);
@@ -6476,7 +6496,8 @@ function bankTopicStats(t){
 }
 
 function bankSummary(){
-  const out = { total: bankAll().length, seen: 0, ok: 0, flagged: BSTORE.flagged.length, topics: {} };
+  const out = { total: bankActive().length, seen: 0, ok: 0, flagged: BSTORE.flagged.length,
+    excluded: BSTORE.excluded.length, topics: {} };
   for (const k of Object.keys(TOPICS)) {
     const s = bankTopicStats(k);
     out.topics[k] = s; out.seen += s.seen; out.ok += s.ok;
@@ -6524,6 +6545,19 @@ function bankGridHTML(){
       </a>`;
     }).join("");
 
+  const exIds = BSTORE.excluded.filter(id => bankById(id));
+  const exRows = exIds.map(id => {
+    const q = bankById(id);
+    const stem = bankStem(q);
+    return `<div class="row">
+      <div class="rtop">${topicTag(q.topic)}<span class="rid">E${q.exam}·S${q.q}</span></div>
+      <div class="ra">${esc(stem.slice(0, 150))}${stem.length > 150 ? "…" : ""}</div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn" onclick="bankToggleExclude('${id}')">Geri al</button>
+      </div>
+    </div>`;
+  }).join("");
+
   const openSessions = Object.values(BSTORE.sessions)
     .filter(s => !s.done).sort((a, b) => b.started - a.started).slice(0, 3)
     .map(s => `<a class="pill" href="#/drill/${s.id}"><span class="tcode">${TOPIC_CODE[s.topic]}</span>${s.i + 1}/${s.ids.length} — devam et</a>`).join("");
@@ -6534,12 +6568,20 @@ function bankGridHTML(){
     <p class="lede">Sınav bloklarına göre değil <b>domaine</b> göre çalış. ${sum.total} sorunun hepsi burada — yalnızca yanlışların değil. Domain etiketleri kursun kendi alanından geliyor, ağırlıklar resmî blueprint'ten (PDF s.3).</p>
 
     ${sum.seen ? callout({ tone: "acc", glyph: "▦", label: "Şu ana kadar",
-      body: `<p style="margin-bottom:0">${sum.seen} / ${sum.total} soru çözüldü · son turlarda <b>%${sum.pct}</b> isabet · ${sum.flagged} işaretli soru. Geçme eşiği ~%72.</p>` }) : ""}
+      body: `<p style="margin-bottom:0">${sum.seen} / ${sum.total} soru çözüldü · son turlarda <b>%${sum.pct}</b> isabet · ${sum.flagged} işaretli soru${sum.excluded ? ` · ${sum.excluded} elendi` : ""}. Geçme eşiği ~%72.</p>` }) : ""}
 
     ${openSessions ? `<h3>Yarım kalan</h3><div class="pills" style="margin-bottom:34px">${openSessions}</div>` : ""}
 
     <h3>Domainler</h3>
     <div class="grid g3" style="margin-bottom:34px">${cards}</div>
+
+    ${exRows ? `<h3>Elenenler <span class="quiet">(${exIds.length})</span></h3>
+      <p class="small quiet reading" style="margin-bottom:16px">Bu sorular havuzdan ve sayımlardan düştü ama yalnızca <b>bu tarayıcıda</b>. Kalıcı silmek için listeyi kopyala, <code>scripts/bank-excluded.json</code> içindeki <code>ids</code> dizisine yapıştır ve bankayı yeniden derle — o zaman ciphertext'ten de çıkarlar.</p>
+      <div class="ledger" style="margin-bottom:16px">${exRows}</div>
+      <div class="btnrow" style="margin-bottom:34px">
+        <button class="btn" id="exCopyBtn" onclick="bankCopyExcluded()">Kalıcı sil için listeyi kopyala</button>
+      </div>
+      <pre id="exCopyOut" hidden class="small" style="margin:-24px 0 34px;padding:14px;border:1px solid var(--rule);border-radius:6px;overflow-x:auto;user-select:all"></pre>` : ""}
 
     <div class="btnrow">
       <a class="btn" href="#/bank/all">Karışık test (tüm domainler)</a>
@@ -6571,7 +6613,7 @@ function bankSet(key, val){
 }
 
 function bankPool(topic, filter){
-  let pool = topic === "all" ? bankAll().slice() : bankInTopic(topic);
+  let pool = topic === "all" ? bankActive() : bankInTopic(topic);
   if (filter === "unseen") pool = pool.filter(q => !bankLastAttempt(q.id));
   else if (filter === "wrong") pool = pool.filter(q => { const l = bankLastAttempt(q.id); return l && !l.ok; });
   else if (filter === "flagged") pool = pool.filter(q => bankFlagged(q.id));
@@ -6698,6 +6740,62 @@ function bankToggleFlag(sid){
   bankPersist(); renderDrill(sid);
 }
 
+/* İki aşamalı eleme. Burası A aşaması: id yerelde tutulur, soru havuzdan ve
+   sayımlardan hemen düşer, tek tıkla geri alınır. B aşaması repoda olur —
+   id `scripts/bank-excluded.json` içindeki `ids` dizisine girer ve yeniden
+   derleme soruyu ciphertext'ten tamamen çıkarır. Ham veri (data/bank-raw.json)
+   hiç budanmaz, o yüzden B aşaması da id'yi dosyadan silip yeniden derleyerek
+   geri alınabilir. */
+function bankToggleExclude(id){
+  const at = BSTORE.excluded.indexOf(id);
+  if (at >= 0) BSTORE.excluded.splice(at, 1); else BSTORE.excluded.push(id);
+  bankPersist();
+  App.router.refresh();
+}
+
+/* Çözerken eleme: soru yürüyen oturumdan da çıkar, yoksa elediğin soru bu
+   turda önüne gelmeye devam ederdi. */
+function bankExcludeCurrent(sid){
+  const s = BSTORE.sessions[sid];
+  if (!s || s.done) return;
+  const id = s.ids[s.i];
+  if (BSTORE.excluded.indexOf(id) < 0) BSTORE.excluded.push(id);
+  s.ids.splice(s.i, 1);
+  delete s.picks[id];
+  if (!s.ids.length) { bankPersist(); bankFinish(sid); return; }
+  if (s.i >= s.ids.length) s.i = s.ids.length - 1;
+  bankPersist(); renderDrill(sid);
+}
+
+/* Kalıcı eleme sonrası soru ciphertext'te yoktur; yerel listede kalan id
+   hayalet satır üretirdi. Kilit her açıldığında sessizce temizlenir. */
+function bankPruneExcluded(){
+  const live = BSTORE.excluded.filter(id => bankById(id));
+  if (live.length !== BSTORE.excluded.length) { BSTORE.excluded = live; bankPersist(); }
+}
+
+/* Pano izni yoksa (güvensiz köken, odak dışı sekme) sessizce hiçbir şey
+   olmasın istemiyoruz: liste ekrana seçilebilir hâlde dökülür. */
+function bankCopyExcluded(){
+  const ids = BSTORE.excluded.filter(id => bankById(id));
+  if (!ids.length) return;
+  const txt = JSON.stringify(ids, null, 2);
+  const b = document.getElementById("exCopyBtn");
+  const out = document.getElementById("exCopyOut");
+  const fallback = () => {
+    if (!out) return;
+    out.textContent = txt; out.hidden = false;
+    if (b) b.textContent = "Pano kapalı — aşağıdan elle kopyala";
+  };
+  if (!navigator.clipboard) { fallback(); return; }
+  navigator.clipboard.writeText(txt).then(() => {
+    if (b) {
+      b.textContent = `✓ ${ids.length} id kopyalandı`;
+      setTimeout(() => { b.textContent = "Kalıcı sil için listeyi kopyala"; }, 2500);
+    }
+  }).catch(fallback);
+}
+
 function bankFinish(sid){
   const s = BSTORE.sessions[sid];
   if (!s) return;
@@ -6773,6 +6871,7 @@ function renderDrill(sid){
       <button class="btn${answered ? " pri" : ""}" onclick="bankNext('${sid}')">
         ${s.i >= s.ids.length - 1 ? "Bitir ve sonucu gör →" : "Sonraki →"}</button>
       <button class="btn" onclick="bankToggleFlag('${sid}')">${bankFlagged(id) ? "İşareti kaldır" : "İşaretle"}</button>
+      <button class="btn" onclick="bankExcludeCurrent('${sid}')" title="Soruyu havuzdan çıkar — #/bank altındaki Elenenler listesinden geri alınır">Bu soruyu ele</button>
       <button class="btn" onclick="bankFinish('${sid}')">Testi bitir</button>
     </div>
     <p class="small quiet" style="margin-top:14px">Klavye: <code>1</code>-<code>4</code> şık · <code>Enter</code> sonraki · <code>F</code> işaretle · <code>X</code> ele</p>`;
@@ -6815,7 +6914,8 @@ function renderReview(sid){
     const q = bankById(id);
     return `<div class="card" style="margin-bottom:16px">
       <div class="qhead">${topicTag(q.topic)}<span class="rid">E${q.exam}·S${q.q}</span>
-        ${bankFlagged(id) ? `<span class="chip"><span aria-hidden="true">⚑</span>İşaretli</span>` : ""}</div>
+        ${bankFlagged(id) ? `<span class="chip"><span aria-hidden="true">⚑</span>İşaretli</span>` : ""}
+        ${bankExcluded(id) ? `<span class="chip"><span aria-hidden="true">⊘</span>Elendi</span>` : ""}</div>
       <div class="qstem" style="font-size:1rem;margin:10px 0 16px">${q.question}</div>
       <div class="ans-wrong">
         <span class="mlabel"><span aria-hidden="true">✗</span>Senin cevabın</span>
@@ -6826,6 +6926,9 @@ function renderReview(sid){
         <div class="body">${q.answers[q.correct]}${q.feedbacks[q.correct] ? `<p class="optfb">${q.feedbacks[q.correct]}</p>` : ""}</div>
       </div>
       ${bankExplain(q)}
+      <div class="btnrow" style="margin-top:0">
+        <button class="btn" onclick="bankToggleExclude('${id}')">${bankExcluded(id) ? "Elemeyi geri al" : "Bu soruyu ele"}</button>
+      </div>
     </div>`;
   }).join("");
 
@@ -6893,6 +6996,8 @@ document.addEventListener("keydown", ev => {
     ev.preventDefault(); bankPrev(arg);
   } else if (ev.key === "f" || ev.key === "F") {
     ev.preventDefault(); bankToggleFlag(arg);
+  } else if (ev.key === "x" || ev.key === "X") {
+    ev.preventDefault(); bankExcludeCurrent(arg);
   }
 });
 
@@ -6905,7 +7010,9 @@ App.services.bank = {
   get unlocked(){ return !!BANK; },
   meta: BANK_BLOB, weight: BANK_WEIGHT,
   byId: bankById, inTopic: bankInTopic, stats: bankTopicStats, summary: bankSummary,
+  get active(){ return bankActive(); },
   attempts: bankAttempts, lastAttempt: bankLastAttempt, flagged: bankFlagged,
+  excluded: bankExcluded, exclude: bankToggleExclude,
   unlock: bankTryUnlock, lock: bankLock,
 };
 /* Analitik yüzeyine additive bağlantı — mevcut hesaplar değişmez. */
