@@ -26,6 +26,11 @@ const ALLOWED_DOC_HOSTS = new Set([
 
 const VALID_VERDICTS = new Set(["ok", "conflict", "dated", "authoritative", "unverified"]);
 
+/* contrast bloğu: çeldiricinin sınıfı ve doğru şıkkın kazandığı eksen. index.html'deki
+   CONTRAST_KIND / CONTRAST_AXIS tabloları ile birebir aynı kalmalı. */
+const VALID_CONTRAST_KINDS = new Set(["both-work", "wrong-layer", "weaker-guarantee", "invented", "scope"]);
+const VALID_CONTRAST_AXES = new Set(["simplicity", "determinism", "cost", "latency", "precision", "official-default"]);
+
 /* Veri bloğundan doldurulur; banka denetimi konu anahtarlarını buradan okur. */
 let TOPIC_KEYS = null;
 
@@ -159,13 +164,35 @@ if (js && errors.length === 0) {
           if (!conceptKeys.has(c)) fail(`${at}: bilinmeyen kavram '${c}'.`);
         }
 
-        for (const d of m.docs ?? []) {
-          if (!Array.isArray(d) || d.length !== 2) { fail(`${at}: docs girdisi [başlık, url] olmalı.`); continue; }
-          let host;
-          try { host = new URL(d[1]).host; } catch { fail(`${at}: geçersiz doc URL '${d[1]}'.`); continue; }
-          // Doğrulanmamış içe-aktarımlar kursun kendi kaynağını taşıyabilir.
-          if (m.verdict !== "unverified" && !ALLOWED_DOC_HOSTS.has(host)) {
-            fail(`${at}: resmî olmayan kaynak '${host}'. Yalnızca Anthropic alan adları.`);
+        // m.docs ve contrast.docs aynı sözleşmeye tabi: [başlık, url], Anthropic alan adı.
+        const checkDocs = (list, where) => {
+          for (const d of list ?? []) {
+            if (!Array.isArray(d) || d.length !== 2) { fail(`${at}: ${where} girdisi [başlık, url] olmalı.`); continue; }
+            let host;
+            try { host = new URL(d[1]).host; } catch { fail(`${at}: geçersiz doc URL '${d[1]}'.`); continue; }
+            // Doğrulanmamış içe-aktarımlar kursun kendi kaynağını taşıyabilir.
+            if (m.verdict !== "unverified" && !ALLOWED_DOC_HOSTS.has(host)) {
+              fail(`${at}: resmî olmayan kaynak '${host}'. Yalnızca Anthropic alan adları.`);
+            }
+          }
+        };
+        checkDocs(m.docs, "docs");
+
+        if (m.contrast !== undefined) {
+          const c = m.contrast;
+          if (typeof c !== "object" || c === null || Array.isArray(c)) {
+            fail(`${at}: contrast bir nesne olmalı.`);
+          } else {
+            if (!VALID_CONTRAST_KINDS.has(c.kind)) fail(`${at}: geçersiz contrast.kind '${c.kind}'.`);
+            if (!VALID_CONTRAST_AXES.has(c.axis)) fail(`${at}: geçersiz contrast.axis '${c.axis}'.`);
+            for (const k of ["yours", "gap", "when", "rec"]) {
+              if (typeof c[k] !== "string" || !c[k].trim()) fail(`${at}: contrast.${k} boş olamaz.`);
+            }
+            checkDocs(c.docs, "contrast.docs");
+            // rec bir olgu iddiasıdır; atıfsız kalmamalı.
+            if (!(c.docs ?? []).length && !(m.docs ?? []).length) {
+              warn(`${at}: contrast var ama ne contrast.docs ne m.docs — 'rec' iddiası atıfsız.`);
+            }
           }
         }
       }

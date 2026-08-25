@@ -1027,7 +1027,9 @@ const NOTES = [
           <li><b>Can it be solved one layer lower?</b> An option that solves at a higher layer (hook, post-processing, extra agent) what could be solved in the source, the schema, or the tool contract is wrong.</li>
           <li><b>Is a guarantee required?</b> If yes, it must be code / hook / permission rule; the model's self-reported confidence is not a guarantee.</li>
           <li><b>What does the extra agent or handoff cost?</b> Every boundary adds context loss and latency. No named benefit, no new boundary.</li>
-        </ol>` },
+        </ol>
+        <p class="small quiet">Generalized beyond simplicity — the other five axes and the five distractor kinds —
+          in the <a class="pill" href="#/note/distractor-axes">Distractor Axes</a> note.</p>` },
       { id: "exceptions", h: "Where complexity is justified", html: `
         <p>Simplicity does not mean "do everything in one pass". Extra structure is the <b>correct</b> answer in these four cases:</p>
         <ul>
@@ -1038,6 +1040,102 @@ const NOTES = [
         </ul>
         <p class="small quiet">Note: the documentation also warns about review subagents — a reviewer primed to look for gaps will report gaps even when the work is sound; ask it to report only gaps that affect correctness or a stated requirement.</p>
         <p class="srcline"><a href="https://code.claude.com/docs/en/best-practices#add-an-adversarial-review-step" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Add an adversarial review step" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+    ],
+  },
+  {
+    id: "distractor-axes", title: "Distractor Axes — Why the Other Working Option Loses", topic: "agent", domain: 1, tasks: [], concept: "simplicity", icon: "◈",
+    summary: "Two options solve the problem; one wins on a named axis. This is the vocabulary for saying which axis, and the condition that would flip the answer back.",
+    source: ["Anthropic Engineering — Building effective agents, \"When (and when not) to use agents\"", "https://www.anthropic.com/engineering/building-effective-agents#when-and-when-not-to-use-agents"],
+    related: [
+      { id: "e5q57", why: "<b>Simplicity.</b> A subagent that adds no named benefit on a one-file fix. Flips when the scope stops being one file." },
+      { id: "e5q56", why: "<b>Scope.</b> Asking plan mode to perform edits — the one thing the mode exists to block." },
+      { id: "e5q5", why: "<b>Simplicity.</b> \"Consistency of implementation\" is not a failure prevented; a reviewed connector already exists." },
+      { id: "e1q1", why: "<b>Cost / wrong layer.</b> Filtering downstream hides the bloat from one consumer; the tool contract still produces it." },
+      { id: "e5q26", why: "<b>Wrong layer.</b> A PostToolUse hook fixes what Claude sees; the server's contract stays broken for every other consumer." },
+      { id: "e1q11", why: "<b>Wrong layer.</b> Parsing in the prompt instead of in a tool that can be tested and versioned." },
+      { id: "e1q15", why: "<b>Official default.</b> A custom hook where a declarative <code>permissions.deny</code> rule already exists." },
+      { id: "e6q35", why: "<b>Precision.</b> Network isolation constrains a boundary that a local <code>kill</code> never crosses." },
+      { id: "e1q36", why: "<b>Determinism.</b> Few-shot changes what the model attempts; a prerequisite changes what the system permits." },
+      { id: "e6q8", why: "<b>Determinism.</b> A negative prompt constraint on the client side of a boundary the server should defend." },
+      { id: "e5q14", why: "<b>Determinism.</b> Model-scored confidence where a deterministic signal — the file path — already exists." },
+      { id: "e2q54", why: "<b>Precision.</b> <code>any</code> forces a tool; only <code>tool</code> forces <i>that</i> tool." },
+      { id: "e5q68", why: "<b>Precision.</b> <code>deny</code> blocks; only <code>ask</code> routes the decision to a human." },
+      { id: "e6q48", why: "<b>Latency.</b> Batching is real cost reduction, paid for in the one currency a blocking PR review cannot spend." },
+      { id: "e8q59", why: "<b>Cost.</b> A permission lever aimed at a context problem; the descriptions are already loaded." },
+    ],
+    sections: [
+      { id: "axes", h: "The six axes — what the winning option wins on", html: `
+        <p>In a well-built question the correct option is not the only one that works. It is the one that costs
+          less on a specific axis. Name the axis and the choice stops being a feeling.</p>
+        <table>
+          <thead><tr><th>Axis</th><th>The question it answers</th><th>What gives it away in the options</th><th>Questions</th></tr></thead>
+          <tbody>
+            <tr><td><b>Simplicity</b></td><td>Which concrete failure does the extra machinery prevent?</td><td>An extra agent, an extra pass, an extra server; justifications like "for consistency" or "for full control"</td><td>E5·Q57, E5·Q5, E5·Q56</td></tr>
+            <tr><td><b>Determinism</b></td><td>Is a guarantee required, or is "usually" enough?</td><td>Few-shot examples, "instruct the model to…", "NEVER…", a model-generated confidence score</td><td>E1·Q36, E6·Q8, E5·Q14</td></tr>
+            <tr><td><b>Precision</b></td><td>Does this force the exact thing, or only something in the right family?</td><td>Two spellings of one mechanism: <code>any</code> vs <code>tool</code>, <code>deny</code> vs <code>ask</code>, a sandbox vs a command gate</td><td>E2·Q54, E5·Q68, E6·Q35</td></tr>
+            <tr><td><b>Cost</b></td><td>Is the waste prevented, or only hidden from one consumer?</td><td>Filtering downstream; denying a tool whose descriptions are already loaded</td><td>E1·Q1, E8·Q59</td></tr>
+            <tr><td><b>Latency</b></td><td>Is anyone waiting on this result?</td><td>Batching, asynchronous delivery, an extra hop before the answer</td><td>E6·Q48</td></tr>
+            <tr><td><b>Official default</b></td><td>Is there a built-in for this, or are you re-implementing one?</td><td>A hand-written hook or script where a settings rule, a flag or a mode already exists</td><td>E1·Q15</td></tr>
+          </tbody>
+        </table>
+        <p class="small quiet">Each question's own card states the axis, the gap, and — the part worth studying — the
+          condition under which the option you picked becomes the correct one.</p>` },
+      { id: "kinds", h: "The five kinds of distractor", html: `
+        <p>Before weighing axes, classify the wrong option. Three of these five are eliminated without any
+          trade-off reasoning at all.</p>
+        <ul>
+          <li><b>Invented</b> — the option names an API, flag, field or file that does not exist
+            (<code>reasoning mode: 'ultra'</code>, <code>.claudeignore</code>, <code>--resume-session</code>).
+            <i>When is it right?</i> Never. The only defence is knowing the real spelling, which is what the
+            <a class="pill" href="#/usage">Syntax cheat-sheet</a> is for. Eliminate these first — they are free.</li>
+          <li><b>Wrong layer</b> — the described work is real, but performed one layer above the cause: filtering
+            after the tool returned, normalizing after both servers disagreed, parsing in the prompt.
+            <i>When is it right?</i> When you do not own the lower layer — a vendor tool, a third-party server.
+            Then the higher layer is the only one you control, and its blind spots are a cost you accept knowingly.</li>
+          <li><b>Weaker guarantee</b> — the option changes what the model is <i>likely to do</i>; the correct one
+            changes what the system <i>permits</i>. <i>When is it right?</i> When no correctness boundary exists:
+            tone, output shape, which of several equally safe tools to try first.</li>
+          <li><b>Both work</b> — both options genuinely solve the problem and one costs less on a named axis.
+            This is the exam's favourite shape and the reason this note exists. <i>When is it right?</i> When a
+            constraint in the scenario changes — the scope widens, latency stops mattering, the deterministic
+            signal disappears.</li>
+          <li><b>Scope</b> — the option assumes a condition the scenario never states, or asks a mechanism to do
+            the very thing it exists to prevent. <i>When is it right?</i> When the unstated condition is stated.</li>
+        </ul>` },
+      { id: "test", h: "The elimination order — five questions, about twenty seconds", html: `
+        <ol>
+          <li><b>Does every option name something that exists?</b> Strike the invented spellings. No reasoning
+            required, so this is always the cheapest move and always first.</li>
+          <li><b>Of the survivors, how many actually solve the problem?</b> If one, you are done. If two, you are
+            in a <i>both-work</i> question and the remaining three questions decide it.</li>
+          <li><b>Is a guarantee required?</b> If the scenario names a consequence — money moves, a secret leaks,
+            a refund is issued — an option that only shifts probability loses to one that changes what is permitted.</li>
+          <li><b>Can it be solved one layer lower?</b> The source, the schema, the tool contract, the server. An
+            option operating above the cause loses unless the lower layer is not yours to change.</li>
+          <li><b>What does the extra mechanism cost, and which failure does it prevent?</b> If you cannot name the
+            failure, the option is decoration.</li>
+        </ol>
+        <p>Then the step that makes the discrimination reusable instead of memorised: <b>state what would have to
+          change in the scenario for the option you rejected to win.</b> That sentence is the "Ne zaman DOĞRU olurdu"
+          block on every card here.</p>
+        <p class="small quiet">Step 5 is the twenty-second test from the
+          <a class="pill" href="#/note/simplest-first">Simplest Solution First</a> note, generalized beyond the
+          simplicity axis.</p>` },
+      { id: "honest", h: "What is documented here, and what is ours", html: `
+        <p>The six axes and the five kinds are <b>this repository's vocabulary</b>. No Anthropic or MCP document
+          publishes this taxonomy; it is a compression of patterns that recur across the fifteen questions listed
+          below. Treat the names as a study aid, never as something to cite.</p>
+        <p class="srcline none">Kaynak: eksen ve sınıf adları bu repoya ait bir sınıflandırmadır — herhangi bir
+          resmî dokümanda geçmez.</p>
+        <p>What <i>is</i> documented is each individual rule underneath an axis, and every card carries its own
+          link to the passage it came from: simplicity to "When (and when not) to use agents"; determinism to the
+          MCP specification's tool security requirements and to Claude Code's permission precedence; precision to
+          the <code>tool_choice</code> option list and the PreToolUse decision-control table; latency to the Message
+          Batches API's own fit test.</p>
+        <p class="srcline"><a href="https://www.anthropic.com/engineering/building-effective-agents#when-and-when-not-to-use-agents" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Kaynağa git — Anthropic Engineering, "When (and when not) to use agents" (ilgili bölüm) <span aria-hidden="true">↗</span></a></p>
+        <p>A practice exam's answer key never justifies an axis. Where a key and a primary source disagree, the
+          record carries <code>verdict: "conflict"</code> and the disagreement is written down rather than quietly
+          resolved — see <a class="pill" href="#/conflicts">Çelişkiler</a>.</p>` },
     ],
   },
   {
@@ -3441,6 +3539,16 @@ const M_BUILTIN = [
     why: "<code>any</code> forces the model to use a tool but does not guarantee <b>which</b> tool. To guarantee a specific schema you force that tool with <code>type: 'tool'</code> plus the exact <code>name</code>.",
     official: "In an agentic flow the coordinator can enforce structured output from a subagent through <code>tool_choice</code>. With type 'tool' and the exact tool name, the model must call that specific tool, and the output conforms to the predefined schema.",
     docs: [["Tool use — forcing tool use", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use"]],
+    contrast: {
+      kind: "both-work", axis: "precision",
+      yours: "<code>{ type: 'any' }</code> does force a tool call — the model must use one of the provided tools, and the API prefills the assistant turn to make it happen.",
+      gap: "It does not force <b>which</b> one. With a single tool defined the two spellings behave identically today; add a second tool to the request and the guarantee you thought you had silently weakens.",
+      when: "<code>any</code> is right when several tools are equally acceptable and all you need is that <i>some</i> tool is called — a router with multiple valid submit endpoints. When one named tool must be the output, <code>{ type: 'tool', name: … }</code> is the only spelling that survives someone extending the tool list.",
+      rec: "<code>any</code> tells Claude it must use one of the provided tools but doesn't force a particular tool; <code>tool</code> forces Claude to always use a particular tool.",
+      docs: [
+      ["Anthropic Docs — Implement tool use, \"Forcing tool use\"", "https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use#forcing-tool-use"],
+      ],
+    },
     related: ["e2q50", "e1q28", "e2q13"], verdict: "ok"
   },
   {
@@ -3463,6 +3571,16 @@ const M_BUILTIN = [
     why: "Filtering in the orchestrator beats telling the agent to 'ignore it', but it puts the data transformation at the <b>wrong layer</b>. The cleanest architecture solves the problem <b>at the source</b> — the tool's output schema returns only what downstream needs (article_text, title, date; not database_id or headers).",
     official: "'Clean data at the source' is a fundamental pattern in multi-agent pipelines. Each tool should return exactly what downstream needs — no more, no less. That eliminates the problem at its origin rather than filtering or instructing around it downstream.",
     docs: [["Tool use — best practices for tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use"]],
+    contrast: {
+      kind: "wrong-layer", axis: "cost",
+      yours: "Stripping metadata at the orchestrator does keep the Summarizer's context clean — those fields never reach it.",
+      gap: "The full metadata object is still produced, returned and paid for once per call, and every future consumer of that tool has to re-implement the same stripping. You moved the symptom, not the cause.",
+      when: "Filter at the orchestrator when the retrieval tool isn't yours to change — a vendor or third-party MCP server — or when different consumers genuinely need different subsets of one response, so no single tool-side projection is correct.",
+      rec: "Design tool responses to return only high-signal information: include only the fields Claude needs to reason about its next step, because bloated responses waste context and make it harder to extract what matters.",
+      docs: [
+      ["Anthropic Docs — Implement tool use, \"Best practices for tool definitions\"", "https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use#best-practices-for-tool-definitions"],
+      ],
+    },
     related: ["e2q57", "e1q11"], verdict: "ok"
   },
   {
@@ -3473,6 +3591,16 @@ const M_BUILTIN = [
     why: "You left HTML parsing to the model — re-parsing raw HTML on every call is brittle and token-expensive, and it breaks silently when the markup changes. The fix is to do the transformation <b>inside the tool</b> (BeautifulSoup/Cheerio) and return clean JSON to the model.",
     official: "A core principle of tool design: do as much work as possible server-side before the data reaches the model. For legacy HTML: fetch inside the tool → parse → extract the relevant rows/columns → return clean, typed JSON. The model then works with fewer tokens, lower latency, and fewer errors.",
     docs: [["Tool use — best practices for tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use"]],
+    contrast: {
+      kind: "wrong-layer", axis: "determinism",
+      yours: "Prompting the agent through HTML table extraction does work on well-formed pages — models read tables.",
+      gap: "It buys no guarantee: every new page shape is a fresh chance to mis-parse, the raw HTML burns context on each call, and a parsing bug can only be fixed by re-tuning a prompt instead of a test suite.",
+      when: "Prompt-level extraction is the right call when the source is genuinely unstructured — free-form prose no parser could target — or as the fallback branch that runs after the deterministic parser fails on an unexpected layout.",
+      rec: "Return only high-signal fields and design tool responses around what the model needs next; a server-side tool puts the parsing somewhere it can be tested and versioned instead of re-derived on every call.",
+      docs: [
+      ["Anthropic Docs — Implement tool use, \"Best practices for tool definitions\"", "https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use#best-practices-for-tool-definitions"],
+      ],
+    },
     related: ["e1q1", "e2q57"], verdict: "ok"
   },
   {
@@ -3483,6 +3611,17 @@ const M_BUILTIN = [
     why: "A PreToolUse hook is a strong defense-in-depth layer — 'partially correct'. But the officially recommended path is simpler and declarative: <code>permissions.deny</code> in <code>settings.json</code>. <b>This question supplies the real mechanism behind the fictional .claudeignore in Exam 2 Q22/Q27.</b>",
     official: "Defense in depth: (1) secrets in environment variables; (2) the <code>permissions.deny</code> block physically prevents patterns such as <code>Read(.env)</code>/<code>Read(.env.*)</code> — even if the user asks; (3) Plan Mode for a read-only session. The Deny → Ask → Allow hierarchy is enforced by the CLI engine.",
     docs: [["Claude Code — Settings (permissions)", "https://code.claude.com/docs/en/settings"]],
+    contrast: {
+      kind: "both-work", axis: "official-default",
+      yours: "A PreToolUse hook matching <code>.env</code> by filename does block the read, and hooks are a documented permission-extension point — this is not an invented mechanism.",
+      gap: "It is code you own and must keep correct, and it does not remove the tool from Claude's context. Deny rules are evaluated regardless of what a hook returns, so the hook is the weaker half of the pair — a supplement to <code>permissions.deny</code>, never its replacement.",
+      when: "Reach for the hook when the decision needs runtime information no static pattern can express: inspecting a command's content, calling a policy service, deciding per branch. The documentation's own example is allowing all of <code>Bash</code> and registering a hook that rejects the few commands you want blocked.",
+      rec: "Permission rules are enforced by Claude Code, not by the model. They evaluate deny → ask → allow, and a bare tool name in <code>deny</code> removes the tool from Claude's context entirely.",
+      docs: [
+      ["Claude Code — Permissions, \"Manage permissions\"", "https://code.claude.com/docs/en/permissions#manage-permissions"],
+      ["Claude Code — Permissions, \"Extend permissions with hooks\"", "https://code.claude.com/docs/en/permissions#extend-permissions-with-hooks"],
+      ],
+    },
     related: ["e2q22", "e2q27"], verdict: "authoritative"
   },
   {
@@ -3513,6 +3652,17 @@ const M_BUILTIN = [
     why: "Few-shot examples only raise the <b>probability</b> — they cannot eliminate the remaining 12% or new edge cases. When safety or correctness depends on a specific tool ordering, the only deterministic fix is enforcing that order <b>in the application layer</b> (a programmatic gate).",
     official: "When production safety depends on a specific tool call ordering, the only reliable approach is enforcing that order programmatically rather than through prompting. Programmatic prerequisites (blocking lookup_order until get_customer succeeds) create deterministic guarantees that model drift and prompt injection cannot break.",
     docs: [["Tool use — best practices for tool definitions", "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/implement-tool-use"], ["Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"]],
+    contrast: {
+      kind: "weaker-guarantee", axis: "determinism",
+      yours: "Few-shot examples do shift the ordering: shown ten transcripts that always call <code>get_customer</code> first, the model will usually follow.",
+      gap: "\"Usually\" is the whole problem. Examples change what the model is <i>likely to attempt</i>; they change nothing about what the system <i>permits</i>. The one call in a hundred that skips verification still reaches <code>process_refund</code>.",
+      when: "Few-shot is the right lever when the target is a preference with no correctness boundary — tone, output shape, which of several equally safe tools to try first. The moment a wrong order has a consequence you can name, it stops being a prompting problem.",
+      rec: "The tool server is where a prerequisite is enforced: servers MUST validate all tool inputs and implement proper access controls.",
+      docs: [
+      ["MCP Specification — Tools, \"Security Considerations\"", "https://modelcontextprotocol.io/specification/2026-07-28/server/tools#security-considerations"],
+      ["Anthropic Engineering — Building effective agents, \"When (and when not) to use agents\"", "https://www.anthropic.com/engineering/building-effective-agents#when-and-when-not-to-use-agents"],
+      ],
+    },
     related: ["e2q13", "e2q54", "e1q53"], verdict: "ok"
   },
   {
@@ -3727,6 +3877,17 @@ const M_BUILTIN = [
     why: "A textbook case of the over-orchestration pattern. \"Consistency\" and \"full control\" sound like architectural virtues, but here they only buy maintenance cost. Do not rewrite a solved integration.",
     official: "Anthropic's advice is to find the simplest solution possible and increase complexity only when needed; complexity is added only when it demonstrably improves outcomes. On the Claude Code side, external services are connected with <code>claude mcp add</code> as standard.",
     docs: [["Anthropic Engineering — Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"], ["Claude Code — MCP", "https://code.claude.com/docs/en/mcp"]],
+    contrast: {
+      kind: "both-work", axis: "simplicity",
+      yours: "One custom server per integration does give you a single implementation pattern and full control over both, exactly as the option claims.",
+      gap: "It also means writing, hosting and maintaining a Jira server that already exists in reviewed form — ongoing cost against no named benefit. Consistency of implementation is not a failure you prevented.",
+      when: "Write the custom one when no reviewed connector covers the surface you need, or when you cannot satisfy the trust check the docs require before connecting a third-party server. That is true of the proprietary approval workflow — and only of it.",
+      rec: "Browse reviewed connectors in the Anthropic Directory and add them with <code>claude mcp add</code>; verify you trust each server before connecting it. Build your own when nothing there fits.",
+      docs: [
+      ["Claude Code — MCP, \"Find and build MCP servers\"", "https://code.claude.com/docs/en/mcp#find-and-build-mcp-servers"],
+      ["Anthropic Engineering — Building effective agents, \"When (and when not) to use agents\"", "https://www.anthropic.com/engineering/building-effective-agents#when-and-when-not-to-use-agents"],
+      ],
+    },
     related: ["e5q14", "e5q46", "e5q57"], verdict: "ok"
   },
   {
@@ -3737,6 +3898,16 @@ const M_BUILTIN = [
     why: "A model's self-reported confidence score is <b>not a guarantee</b> — thresholding an uncalibrated number is not filtering, it is an imitation of filtering. A file path is deterministic and correlates directly with risk.",
     official: "Raw confidence scores invite both overconfidence and over-escalation; consistent agent behavior comes from <b>calibrated thresholds</b>. The official guidance also warns that a reviewer primed to look for gaps will report gaps even when the work is sound — so ask only for gaps that affect correctness or a stated requirement.",
     docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#add-an-adversarial-review-step"]],
+    contrast: {
+      kind: "both-work", axis: "determinism",
+      yours: "A verification pass where the model attaches its own confidence does produce a rankable number, and filtering on it will shrink the human queue.",
+      gap: "The score comes from the same model that produced the finding, so a confidently-wrong finding scores high and nothing outside the model checks it. The routing criterion ends up exactly as uncertain as the thing it is routing.",
+      when: "Model classification is the documented option when the categories are only separable semantically and no deterministic signal exists. Here one does exist — the source file path — and when a deterministic signal exists it wins. Routing fits \"where classification can be handled accurately, either by an LLM or a more traditional classification model/algorithm\"; that <i>or</i> is a fallback, not a coin flip.",
+      rec: "Routing classifies an input and directs it to a specialized followup task; it fits where classification can be handled accurately, by an LLM or by a traditional algorithm.",
+      docs: [
+      ["Anthropic Engineering — Building effective agents, \"Workflow: Routing\"", "https://www.anthropic.com/engineering/building-effective-agents#workflow-routing"],
+      ],
+    },
     related: ["e5q5", "e5q20"], verdict: "ok"
   },
   {
@@ -3766,6 +3937,16 @@ const M_BUILTIN = [
     why: "Do not confuse this with <a href='#/q/e5q66'>e5q66</a> — they do not contradict each other. What is broken here is the <b>tool contract</b>, and a contract is fixed at its source. A hook patches the broken contract and changes only what Claude sees: the tool has already run, telemetry recorded the original output, and other clients of the same tool keep receiving the broken format.",
     official: "<code>updatedToolOutput</code> changes only what Claude sees. By the time the hook fires, the tool has run — files written, commands executed, and network requests sent have already taken effect. OpenTelemetry tool spans and analytics events also capture the original output from before the hook ran.",
     docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks#posttooluse"]],
+    contrast: {
+      kind: "wrong-layer", axis: "precision",
+      yours: "A PostToolUse hook genuinely can normalize both formats: <code>updatedToolOutput</code> replaces the result for built-in and MCP tools alike, and the docs point at PostToolUse for exactly this kind of inbound transformation.",
+      gap: "It only changes <b>what Claude sees</b>. The tools have already run, telemetry captured the original output, and every other consumer of those two servers still receives the inconsistent dates. One client is patched; the contract is still broken.",
+      when: "The hook becomes the right answer when you don't own the servers — a vendor endpoint you cannot patch. Then it is the only layer you control, and its blind spots (telemetry, other clients) are a cost you accept knowingly rather than a mistake.",
+      rec: "Intercept at PreToolUse for outbound tool inputs and PostToolUse for inbound tool results — but <code>updatedToolOutput</code> only changes what Claude sees; the tool has already run by the time the hook fires.",
+      docs: [
+      ["Claude Code — Hooks, \"PostToolUse decision control\"", "https://code.claude.com/docs/en/hooks#posttooluse-decision-control"],
+      ],
+    },
     related: ["e5q66"], verdict: "ok"
   },
   {
@@ -3805,6 +3986,17 @@ const M_BUILTIN = [
     why: "You picked the right mechanism but did not know when to <b>leave</b> it. Plan mode is a phase, not a lifestyle: after the plan is approved you must exit the mode to make edits. The official flow has four phases — Explore → Plan → Code → Commit.",
     official: "Plan mode lets Claude research and propose changes without making them; edits stay blocked until you approve the plan. Approving the plan exits plan mode and moves the session into the permission mode you chose, so Claude can start editing. Planning helps most when you are unsure about the approach, when the change touches multiple files, or when you are unfamiliar with the code.",
     docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#explore-first-then-plan-then-code"], ["Claude Code — Permission modes", "https://code.claude.com/docs/en/permission-modes#analyze-before-you-edit-with-plan-mode"]],
+    contrast: {
+      kind: "scope", axis: "simplicity",
+      yours: "You picked the right entry point — plan mode is exactly how you audit usage patterns across a codebase before touching it.",
+      gap: "But plan mode <b>blocks edits until you approve the plan</b>. Asking to stay in it \"including each individual edit\" asks a mode to do the one thing it exists to prevent; the migration could never be implemented from inside it.",
+      when: "Staying in plan mode end to end is right when the deliverable <i>is</i> the analysis: a migration report, an impact assessment, an audit with no edits at all. And if what you actually want is a gate before every edit, that is <code>default</code> (Manual) mode — reads run without asking, everything else prompts — not plan mode.",
+      rec: "The recommended workflow has four phases — explore, plan, code, commit. Plan mode covers the first two; execution starts after the plan is approved.",
+      docs: [
+      ["Claude Code — Best practices, \"Explore first, then plan, then code\"", "https://code.claude.com/docs/en/best-practices#explore-first-then-plan-then-code"],
+      ["Claude Code — Permission modes, \"Available modes\"", "https://code.claude.com/docs/en/permission-modes#available-modes"],
+      ],
+    },
     related: ["e5q57"], verdict: "ok"
   },
   {
@@ -3815,6 +4007,16 @@ const M_BUILTIN = [
     why: "You chose the right mode, then layered unrequested discovery on top. \"Where else does this occur?\" is good engineering instinct, but <b>it is not the work that was asked for</b>; on the exam, the option that widens scope is the wrong option. The criterion is clear: if you can describe the diff in one sentence, no extra mechanism.",
     official: "For work with clear scope and a small fix (a typo, a log line, a variable rename), just ask directly; plan mode is useful but adds overhead. Subagents exist for <b>wide</b> discovery that would flood the main context — unscoped research makes it read hundreds of files.",
     docs: [["Claude Code — Best practices", "https://code.claude.com/docs/en/best-practices#use-subagents-for-investigation"], ["Claude Code — Subagents", "https://code.claude.com/docs/en/sub-agents#choose-between-subagents-and-main-conversation"]],
+    contrast: {
+      kind: "both-work", axis: "simplicity",
+      yours: "An Explore subagent really does answer \"is this bug copied elsewhere?\", and it answers it in a separate context window, so summaries come back instead of file dumps.",
+      gap: "The docs put a <b>quick, targeted change</b> and latency-sensitive work in the main conversation. A subagent that isn't a fork starts fresh and needs time to gather context before it can say anything — cost with no failure it prevents here, because the stack trace already names the line.",
+      when: "It flips the moment the scope stops being one function. If you suspect the pattern was copy-pasted and a codebase-wide sweep would produce verbose output you don't want in the main context, the subagent becomes the correct option — that is the documentation's own criterion, not taste.",
+      rec: "Main conversation for quick, targeted changes and when latency matters; subagents when the work is self-contained, can return a summary, and would otherwise flood your context.",
+      docs: [
+      ["Claude Code — Subagents, \"Choose between subagents and main conversation\"", "https://code.claude.com/docs/en/sub-agents#choose-between-subagents-and-main-conversation"],
+      ],
+    },
     related: ["e5q56", "e5q5"], verdict: "ok"
   },
   {
@@ -3845,6 +4047,16 @@ const M_BUILTIN = [
     why: "<code>deny</code> is not an approval flow; it <b>cancels</b> the call. Writing \"consult a human\" in the reason passes a suggestion to the model, it does not install an approval gate in the workflow — the $600 refund ends up rejected, not held. Human-in-the-loop approval is precisely the definition of <code>ask</code>.",
     official: "In a PreToolUse hook, the <code>permissionDecision</code> field accepts <code>allow</code>, <code>deny</code>, <code>ask</code>, and <code>defer</code>. <code>\"allow\"</code> bypasses the permission prompt, <code>\"deny\"</code> blocks the tool call, <code>\"ask\"</code> asks the user to confirm, and <code>\"defer\"</code> exits cleanly so the tool can be resumed later. <code>permissionDecisionReason</code> is shown to the user for <code>allow</code> and <code>ask</code> (not to Claude), and to Claude for <code>deny</code>.",
     docs: [["Claude Code — Hooks", "https://code.claude.com/docs/en/hooks#pretooluse"]],
+    contrast: {
+      kind: "both-work", axis: "precision",
+      yours: "<code>deny</code> does stop the operation, and on a deny the <code>permissionDecisionReason</code> is shown to Claude — so your text really does reach the model.",
+      gap: "Nothing reaches the human. <code>deny</code> ends the call; there is no approval path, so \"consult a human\" becomes advice the model can only act on by giving up.",
+      when: "<code>deny</code> is right when the operation must never run in this session and no in-session approval should be possible — a hard block, with the reason addressed to Claude so it can choose another route. <code>ask</code> is right when a human should decide, which is what the scenario asked for; note its reason goes to the user, not to Claude.",
+      rec: "<code>\"deny\"</code> prevents the tool call and its reason is shown to Claude; <code>\"ask\"</code> prompts the user to confirm and its reason is shown to the user but not to Claude.",
+      docs: [
+      ["Claude Code — Hooks, \"PreToolUse decision control\"", "https://code.claude.com/docs/en/hooks#pretooluse-decision-control"],
+      ],
+    },
     related: ["e5q66", "e5q24"], verdict: "authoritative"
   },
   {
@@ -3855,6 +4067,16 @@ const M_BUILTIN = [
     why: "Your reading of the distractor was right: <code>tool_choice: {\"type\": \"any\"}</code> forces the model to call <b>some</b> tool, never a particular one and never in a particular order, so it cannot express \"verify first\". But a negative constraint is still a sentence in a prompt — it lowers the probability of the wrong order, it does not remove it. <b>Ordering is a property of the tool contract, not of the wording.</b> Make the second tool structurally unusable until the first one has run, and the model's choice stops mattering.",
     official: "There are four <code>tool_choice</code> options: <code>auto</code> (default with tools), <code>any</code> — \"tells Claude that it must use one of the provided tools, but doesn't force a particular tool\" — <code>tool</code> (one named tool), and <code>none</code>. None of them encodes a sequence. MCP tools declare their inputs in a JSON Schema, so a required <code>session_token</code> parameter is enforced by the server before the handler runs.",
     docs: [["Anthropic Docs — Tool use, \"Forcing tool use\"", "https://platform.claude.com/en/docs/agents-and-tools/tool-use/implement-tool-use#forcing-tool-use"], ["MCP — Tools", "https://modelcontextprotocol.io/docs/concepts/tools"]],
+    contrast: {
+      kind: "weaker-guarantee", axis: "determinism",
+      yours: "A negative constraint does lower the rate — told never to call <code>get_account_details</code> before verification, the model mostly complies.",
+      gap: "It is a probability living on the client side of a boundary the server is meant to defend. Any other caller — a different client, a replayed transcript, a direct request — reaches the same tool with no constraint at all.",
+      when: "Keep the prompt line as a <i>hint</i>, so the model doesn't waste turns attempting a call the gate will reject. It rides on top of the gate; it is never the gate. No phrasing of a negative instruction converts it into an access control.",
+      rec: "Servers MUST validate all tool inputs and implement proper access controls — the prerequisite belongs in the tool server, not in the prompt.",
+      docs: [
+      ["MCP Specification — Tools, \"Security Considerations\"", "https://modelcontextprotocol.io/specification/2026-07-28/server/tools#security-considerations"],
+      ],
+    },
     related: ["e5q68", "e6q35"], verdict: "ok"
   },
   {
@@ -3885,6 +4107,17 @@ const M_BUILTIN = [
     why: "You were weighing \"a sandbox cannot make the mistake at all\" against \"a hook can be written wrong\" — a fair trade in general, but it is the wrong instrument <b>for this task</b>. The job is diagnosing a live production box; a sandbox whose whole value is cutting network and filesystem reach removes the subject of the investigation. And the sandbox has no opinion about <i>which</i> PID gets signalled — it either permits <code>kill</code> or it does not. A PreToolUse hook sees the assembled command string before execution and can allow <code>kill 4821</code> while denying <code>kill 1</code>.",
     official: "PreToolUse \"runs after Claude creates tool parameters and before processing the tool call\" and matches on tool name, including <code>Bash</code>; its <code>permissionDecision</code> can <code>allow</code>, <code>deny</code>, or <code>ask</code>. The Bash sandbox is a different layer: it enforces filesystem and network boundaries for every Bash command and its child processes — a perimeter, not a per-argument rule.",
     docs: [["Claude Code — Hooks, \"PreToolUse\"", "https://code.claude.com/docs/en/hooks#pretooluse"], ["Claude Code — Sandboxed Bash tool", "https://code.claude.com/docs/en/sandboxing"]],
+    contrast: {
+      kind: "wrong-layer", axis: "precision",
+      yours: "The sandbox is a real containment layer, and its network isolation genuinely stops a sandboxed process from reaching hosts outside the allowlist.",
+      gap: "<code>kill</code> sends a signal to a <b>local</b> process; it crosses no network boundary, so the domain allowlist never sees it. The mechanism constrains a different dimension of risk than the one the question names.",
+      when: "The sandbox is the right answer when the danger is reaching production — a deploy script, an API call against a live system, a key being exfiltrated. There network isolation is the strong control and a PreToolUse hook matching command strings would be the weak one. Match the layer to the boundary the action actually crosses.",
+      rec: "The sandbox isolates Bash subprocesses along filesystem and network boundaries; to gate a specific command before it runs, use a PreToolUse hook.",
+      docs: [
+      ["Claude Code — Sandboxing, \"Network isolation\"", "https://code.claude.com/docs/en/sandboxing#network-isolation"],
+      ["Claude Code — Hooks, \"PreToolUse\"", "https://code.claude.com/docs/en/hooks#pretooluse"],
+      ],
+    },
     related: ["e5q68", "e6q8"], verdict: "ok"
   },
   {
@@ -3915,6 +4148,16 @@ const M_BUILTIN = [
     why: "You reached for the <b>price</b> lever when the problem is the <b>volume</b> lever. Batches take 50% off whatever you send — a repo-sized prompt at half price is still a repo-sized prompt, and the diff is orders of magnitude smaller. Worse, batches are asynchronous, and a PR gate is blocking: your instinct that a change might ripple into untouched code is real, but the answer to that is a few lines of surrounding context (or a targeted second pass), not shipping the whole tree.",
     official: "The Message Batches API processes requests \"asynchronously… reducing costs by 50%\", with results available \"when all messages have completed or after 24 hours, whichever comes first\"; batches expire if they do not finish in 24 hours. Anthropic's own cost guidance is to keep context small first, then let prompt caching handle what repeats.",
     docs: [["Anthropic Docs — Batch processing, \"Batch limitations\"", "https://platform.claude.com/en/docs/build-with-claude/batch-processing#batch-limitations"], ["Claude Code — Manage costs, \"Reduce token usage\"", "https://code.claude.com/docs/en/costs#reduce-token-usage"]],
+    contrast: {
+      kind: "both-work", axis: "latency",
+      yours: "Batching the security review is real cost reduction, and the per-file review prompts are independent — the shape batching wants.",
+      gap: "A PR review blocks someone's merge. Batches are asynchronous: most finish within an hour, results become available when every request completes or after 24 hours, and a batch that doesn't finish in 24 hours expires. The saving is paid for in the one currency the scenario cannot spend.",
+      when: "Batch it the moment the review stops blocking anyone — a nightly sweep over open PRs, a backfill across the repo's history, a periodic audit. The documentation's own fit test is bulk operations that don't require immediate results.",
+      rec: "The Message Batches API is especially useful for bulk operations that don't require immediate results; each request is processed asynchronously and the batch expires if it doesn't complete within 24 hours.",
+      docs: [
+      ["Anthropic Docs — Batch processing, \"How the Message Batches API works\"", "https://platform.claude.com/docs/en/build-with-claude/batch-processing#how-the-message-batches-api-works"],
+      ],
+    },
     related: ["e6q60", "e6q41"], verdict: "ok"
   },
   {
@@ -4081,6 +4324,16 @@ const M_BUILTIN = [
       ["Claude Code — Subagents, \"Scope MCP servers to a subagent\"", "https://code.claude.com/docs/en/sub-agents#scope-mcp-servers-to-a-subagent"],
       ["Claude Code — Subagents, \"Supported frontmatter fields\"", "https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields"],
     ],
+    contrast: {
+      kind: "both-work", axis: "cost",
+      yours: "<code>disallowedTools</code> does stop the main agent from calling those 25 browser tools — access is genuinely revoked.",
+      gap: "It is a permission lever aimed at a context problem. The descriptions are already loaded by the time the deny applies, so both symptoms the question names — the token cost and the degraded tool selection — survive it untouched.",
+      when: "<code>disallowedTools</code> is the right lever when the server genuinely belongs in the main conversation and you only want one agent barred from <i>using</i> it: access control, not context budget. Ask which of the two you are actually solving.",
+      rec: "To keep an MCP server out of the main conversation entirely and avoid its tool descriptions consuming context there, define it inline in the subagent's <code>mcpServers</code> rather than in <code>.mcp.json</code>.",
+      docs: [
+      ["Claude Code — Subagents, \"Scope MCP servers to a subagent\"", "https://code.claude.com/docs/en/sub-agents#scope-mcp-servers-to-a-subagent"],
+      ],
+    },
     related: ["e8q56"], verdict: "ok"
   },
 ];
@@ -4150,6 +4403,25 @@ const VERDICT = {
   dated:         { glyph: "◑", label: "Kabaca doğru ama güncel değil", short: "Güncel değil", cls: "v-warn" },
   authoritative: { glyph: "★", label: "Resmî doğruyu veren referans soru", short: "Doğruyu veren", cls: "v-ok" },
   unverified:    { glyph: "◷", label: "Henüz resmî kaynakla doğrulanmadı", short: "Doğrulanmadı", cls: "v-warn" },
+};
+
+/* Çeldiricinin sınıfı: senin şıkkın hangi tür hata. Taksonomi bize ait — #/note/distractor-axes. */
+const CONTRAST_KIND = {
+  "both-work":        { glyph: "≈", label: "İkisi de çalışır" },
+  "wrong-layer":      { glyph: "⇅", label: "Yanlış katman" },
+  "weaker-guarantee": { glyph: "◐", label: "Zayıf garanti" },
+  "invented":         { glyph: "∅", label: "Var olmayan API" },
+  "scope":            { glyph: "⤢", label: "Kapsam kayması" },
+};
+
+/* Doğru şıkkın kazandığı eksen. */
+const CONTRAST_AXIS = {
+  "simplicity":       "Basitlik",
+  "determinism":      "Determinizm",
+  "cost":             "Maliyet",
+  "latency":          "Gecikme",
+  "precision":        "Kesinlik",
+  "official-default": "Resmî varsayılan",
 };
 
 /* İçe aktarılan metin ham yapıştırmadır — kaçırılır. Built-in kayıtlar HTML içerir. */
@@ -4329,6 +4601,28 @@ function callout(o){
     ? `<span class="mlabel">${o.glyph ? `<span aria-hidden="true">${o.glyph}</span>` : ""}${o.label}</span>`
     : "";
   return `<div class="note${tone}${reading}"${style}>${label}${o.body || ""}</div>`;
+}
+
+/* Çeldirici analizi bloğu. m.contrast yoksa hiç render edilmez. */
+function contrastBlock(m){
+  const c = m.contrast;
+  if (!c) return "";
+  const kind = CONTRAST_KIND[c.kind] || { glyph: "◆", label: c.kind };
+  const axis = CONTRAST_AXIS[c.axis] || c.axis;
+  return `<h3 id="celdirici">Çeldirici analizi</h3>
+    <p class="small quiet reading" style="margin:-6px 0 14px">İki şık da işi görüyor olabilir; soru hangisinin
+      <b>hangi eksende</b> kazandığı.</p>
+    <div class="meta" style="margin-bottom:14px">
+      <span class="chip"><span aria-hidden="true">${kind.glyph}</span>${kind.label}</span>
+      <span class="chip"><span aria-hidden="true">◆</span>Kazandığı eksen: ${axis}</span>
+    </div>
+    ${callout({ tone: "warn", glyph: "◐", label: "Senin şıkkın ne yapıyor",
+      body: `<p>${c.yours}</p><p style="margin-bottom:0"><b>Eksik kalan:</b> ${c.gap}</p>` })}
+    ${callout({ tone: "ok", glyph: "⟳", label: "Ne zaman DOĞRU olurdu",
+      body: `<p style="margin-bottom:0">${c.when}</p>` })}
+    ${callout({ tone: "acc", glyph: "❖", label: "Dokümanın varsayılanı",
+      body: `<p style="margin-bottom:0">${c.rec}</p>${srcJump(c.docs && c.docs.length ? c.docs : m.docs)}` })}
+    <div class="pills" style="margin-top:14px"><a class="pill" href="#/note/distractor-axes">Eksen sözlüğü →</a></div>`;
 }
 
 /* Sağ sütun içindekiler. items: [{href,label}] veya falsy (atlanır). */
@@ -4644,6 +4938,8 @@ function renderQuestion(id){
           body: `<p style="margin-bottom:0">${field(m, "official")}</p>${srcJump(m.docs)}`,
         })}
 
+        ${contrastBlock(m)}
+
         ${(m.docs || []).length ? `<h3 id="kaynak">Resmî kaynaklar</h3>
           <div class="reading">${m.docs.map(d => docHTML(d[0], d[1])).join("")}</div>` : ""}
 
@@ -4669,6 +4965,7 @@ function renderQuestion(id){
         { href: "#soru", label: "Soru" },
         { href: "#neden", label: "Neden kaçırdın" },
         { href: "#resmi", label: "Resmî açıklama" },
+        m.contrast && { href: "#celdirici", label: "Çeldirici analizi" },
         (m.docs || []).length && { href: "#kaynak", label: "Kaynaklar" },
         rel.length && { href: "#ilgili", label: "İlgili sorular" },
       ])}
@@ -5362,7 +5659,7 @@ const App = {
 
   components: {
     topicTag, diffStars, verdictChip, row: rowHTML, questionCard: rowHTML,
-    ledger, doc: docHTML, badge, progressBar, callout, toc, tocJump, section, examCard, noteCard,
+    ledger, doc: docHTML, badge, progressBar, callout, contrastBlock, toc, tocJump, section, examCard, noteCard,
     usageCard, usageSnippet,
   },
 
@@ -6442,7 +6739,7 @@ function renderDrill(sid){
     if (reveal && k === q.correct) cls += " ok";
     else if (reveal && k === picked) cls += " no";
     else if (!reveal && k === picked) cls += " sel";
-    const fb = reveal && (k === q.correct || k === picked) && q.feedbacks[k]
+    const fb = reveal && q.feedbacks[k]
       ? `<p class="optfb">${q.feedbacks[k]}</p>` : "";
     return `<button class="${cls}" type="button" ${answered ? "disabled" : ""} onclick="bankPick('${sid}', ${k})">
       <span class="key" aria-hidden="true">${k + 1}</span>
@@ -6478,7 +6775,7 @@ function renderDrill(sid){
       <button class="btn" onclick="bankToggleFlag('${sid}')">${bankFlagged(id) ? "İşareti kaldır" : "İşaretle"}</button>
       <button class="btn" onclick="bankFinish('${sid}')">Testi bitir</button>
     </div>
-    <p class="small quiet" style="margin-top:14px">Klavye: <code>1</code>-<code>4</code> şık · <code>Enter</code> sonraki · <code>F</code> işaretle</p>`;
+    <p class="small quiet" style="margin-top:14px">Klavye: <code>1</code>-<code>4</code> şık · <code>Enter</code> sonraki · <code>F</code> işaretle · <code>X</code> ele</p>`;
 }
 
 /* ---- Sonuç (#/review/<sid>) ---- */
@@ -6522,11 +6819,11 @@ function renderReview(sid){
       <div class="qstem" style="font-size:1rem;margin:10px 0 16px">${q.question}</div>
       <div class="ans-wrong">
         <span class="mlabel"><span aria-hidden="true">✗</span>Senin cevabın</span>
-        <div class="body">${q.answers[s.picks[id]]}</div>
+        <div class="body">${q.answers[s.picks[id]]}${q.feedbacks[s.picks[id]] ? `<p class="optfb">${q.feedbacks[s.picks[id]]}</p>` : ""}</div>
       </div>
       <div class="ans-right">
         <span class="mlabel"><span aria-hidden="true">✓</span>Doğrusu</span>
-        <div class="body">${q.answers[q.correct]}</div>
+        <div class="body">${q.answers[q.correct]}${q.feedbacks[q.correct] ? `<p class="optfb">${q.feedbacks[q.correct]}</p>` : ""}</div>
       </div>
       ${bankExplain(q)}
     </div>`;
