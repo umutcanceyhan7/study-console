@@ -60,9 +60,10 @@ Static single-page study console for CCA-F / CCAR-F certification prep, deployed
 
 ## Question bank (`#/bank`)
 
-430 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
-+ BONUS Set 2, exams 1/2/3/5/6), 60 from CertSafari (exam 7), and 60 from a second Udemy course
-("Claude Certified Architect Foundations - 6 Practice Exams", Practice Test 1, exam 8).
+529 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
++ BONUS Set 2, exams 1/2/3/5/6), 159 from CertSafari across six attempts (exams 7 and 9–13), and 60
+from a second Udemy course ("Claude Certified Architect Foundations - 6 Practice Exams", Practice
+Test 1, exam 8).
 Separate from `M_BUILTIN` in every way — do not merge them.
 The scrape-to-embed pipeline for both platforms is written down in `INGEST.md` — read it before
 adding another exam.
@@ -93,6 +94,27 @@ the bare Udemy names — still no inference. The blueprint `subdomain` string is
 reaches the bank (which renders with `innerHTML`). Every question carries an explanation for all
 four options; the UI already shows the correct option's and the picked option's.
 Counts (exam 7): agent 14 · cc 12 · pe 12 · ctx 12 · tool 10.
+
+**CertSafari attempts 2–6 (`exam: 9`–`13`).** Five more attempts, added 2026-08-31. Numbering is
+chronological so that dedup's "first seen keeps the question" rule prefers the older attempt:
+9 = `K61jtZxsjC3BKZK` (10q, 10/10) · 10 = `xsJm04ZKoTWREkR` (10q, 10/10) ·
+11 = `vMmftdbfaJwIlIP` (30q, 27/30) · 12 = `ikWTR1dzO1pkmRp` (30q, 26/30, one unanswered) ·
+13 = `Ed0mjtDTP3YGkaq` (30q, 22/30).
+
+The pool serves questions at random, so attempts overlap: 109 attempt rows → 105 distinct questions →
+**99 fresh** after dropping the six already in exam 7. Dedup is by `cs-<questionId>` and skipped
+records are printed by the merge script, never silently dropped. A question's `q` is its position in
+the attempt that first served it, so numbering inside an exam has gaps — that is deliberate.
+Counts: E9 9 · E10 9 · E11 27 · E12 27 · E13 27. Domains across all CertSafari records:
+agent 36 · cc 34 · pe 31 · ctx 31 · tool 27.
+
+**Three CertSafari-only record fields.** `note` carries the user's own study notes from the platform,
+bound by `question_id` and therefore independent of which attempt's record survived dedup — a note
+written during exam 13 lands on an exam 7 record when that is where the question lives. `miss` marks
+a question answered wrong in *any* attempt. `stale` plus `successor` marks a question CertSafari has
+retired upstream (`is_active: false`), which happens often enough to matter: 7 of the 99 new records.
+Retired questions are kept, because they are what was actually answered. The `#/qnotes` screen reads
+`note`; it is gated on the bank being unlocked, because the notes ride inside the ciphertext.
 
 **Second Udemy course (`exam: 8`, ids `bx8-<order>`).** Quiz 7570481, "Practice Test 1", 60 questions,
 scraped **entirely from the result DOM** — its `assessments` API revision serves 60 questions whose
@@ -132,6 +154,43 @@ overwrite an unread file under the read-before-edit conditions, and every model 
 v2.1.228. The keyed option is still the best of the four (Grep does **not** satisfy the requirement;
 viewing with Bash does), but the flat claim is stale. Checked 2026-08-25. All seven are now
 `M_BUILTIN` records (`e7q3` … `e7q60`), q60 carrying `verdict: "dated"`.
+
+**Verified so far (exams 9–13).** All 14 questions missed across attempts 2–6, plus 6 answered
+correctly but carrying a study note, were checked against primary docs on 2026-08-31 and written as
+`M_BUILTIN` records (`e11q5` … `e13q29`). The six noted-but-correct records carry `hit: true`: they
+are not mistakes, so every "wrong" counter in the UI and the per-exam check in `validate.mjs`
+excludes them, while `#/mistakes` still lists them. `renderQuestion` swaps its labels on the flag
+("Neden not aldın" instead of "Neden kaçırdın"), except when the record is also a `conflict` — there
+the answer matched the key but not the docs, so both answer boxes stay visible.
+
+**Four divergences found, three of them hard conflicts.**
+
+- **`headersHelper` and Kerberos** (`e13q15`, exam 13 q15). The course keys "don't configure Kerberos
+  in Claude Code, put an intermediary service in front" and justifies it by claiming the helper's
+  output "is cached for the transport lifetime", citing bug reports. The docs name Kerberos as a
+  `headersHelper` use case and say the opposite about caching: "Claude Code runs the helper fresh on
+  each connection… It doesn't cache the result."
+  ([mcp#use-dynamic-headers-for-custom-authentication](https://code.claude.com/docs/en/mcp#use-dynamic-headers-for-custom-authentication))
+- **`${CLAUDE_PROJECT_DIR}` in `.mcp.json`** (`e11q21`, exam 11 q21). The course keys "it resolves
+  correctly, Claude Code injects the variable". The docs draw the opposite conclusion for exactly the
+  configuration in the question: the variable is set in the *server's* environment, not Claude Code's,
+  so a project-scoped entry "requires a default such as `${CLAUDE_PROJECT_DIR:-.}`". **All four options
+  are wrong** — an unset variable with no default is passed through as the literal `${VAR}` text with a
+  warning in `claude mcp list`, so it is neither the path nor an empty string.
+  ([mcp#option-3-add-a-local-stdio-server](https://code.claude.com/docs/en/mcp#option-3-add-a-local-stdio-server))
+- **Subagent nesting depth** (`e13q8`, exam 13 q8). The course keys "five levels, including the main
+  agent". The docs say three layers below the main conversation, by default, and the limit is
+  configurable with `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` (`1` turns nesting off). No option states
+  this. ([sub-agents#let-subagents-spawn-their-own-subagents](https://code.claude.com/docs/en/sub-agents#let-subagents-spawn-their-own-subagents))
+- **`updatedInput` without `permissionDecision`** (`e12q9`, exam 12 q9). The keyed answer is right,
+  but its stated reason is not in the docs; that the normal permission flow applies follows from what
+  `permissionDecision: "allow"` is defined to do. The scenario itself is also broken: `updatedInput`
+  replaces a tool's *input parameters*, so it cannot redirect a call to a different tool.
+  Recorded as `verdict: "ok"` with the gap named in the record.
+
+Three records rest on `exam-preparation-guide.md` alone and render the `.srcline none` variant with
+no doc link: `e12q1` (what a self-correction turn should contain), `e13q26` (retry limits) and
+`e13q27` (per-field confidence).
 
 **Dropping questions.** Some bank questions are far off exam format or teach nothing; they are
 removed in two stages. Stage A is in the browser: the "Bu soruyu ele" button (drill, review card, or

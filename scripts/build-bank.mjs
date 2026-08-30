@@ -104,6 +104,13 @@ let bank = raw.map((a, idx) => {
     ...(a.scenario ? { scenario: a.scenario } : {}),
     ...(a.subdomain ? { subdomain: a.subdomain } : {}),
     ...(a.source ? { source: a.source } : {}),
+    /* CertSafari'ye özgü iki alan. `note` kullanıcının kendi sözü — kursun
+       açıklamasıyla aynı yerde durmaz, arayüzde ayrı çizilir. `stale` sorunun
+       upstream'de emekliye ayrıldığını söyler; kayıt yine de kalır çünkü
+       denemede görülen metin budur. */
+    ...(Array.isArray(a.note) && a.note.length ? { note: a.note } : {}),
+    ...(a.stale ? { stale: 1, successor: a.successor ?? null } : {}),
+    ...(a.miss ? { miss: 1 } : {}),
     question: clean(a.question),
     answers: a.answers.map(clean),
     correct,

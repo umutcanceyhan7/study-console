@@ -71,10 +71,10 @@ BANK_PASSWORD='...' node scripts/build-bank.mjs && node scripts/validate.mjs
 **Sonuç: Udemy id'leri ile `M_BUILTIN` id'leri eşleşmez.** `M_BUILTIN` artık var
 olmayan bir revizyondan geliyor; ortak eksen yalnızca `topic`. Eşleme uydurma.
 
-## CertSafari (exam 7) — yapılan iş
+## CertSafari (exam 7 ve 9–13) — yapılan iş
 
 Adres: `https://www.certsafari.com/anthropic/claude-certified-architect-foundations`
-480 soru, ücretsiz, CCAR-F 1.0 rehberine göre etiketli. Deneme: 60 soru, 53 doğru.
+Ücretsiz, CCAR-F 1.0 rehberine göre etiketli. Altı deneme çözüldü, 159 soru bankada.
 
 1. **Sorular giriş istemez.** `POST /api/quiz-nth-question {quiz_id, question_index}`
    yalnızca sınav token'ını ister — çerez, oturum, user_id yok. `quiz_id`, sonuç
@@ -91,17 +91,33 @@ Adres: `https://www.certsafari.com/anthropic/claude-certified-architect-foundati
    ```bash
    bash data/certsafari/scrape.sh <resume-token> data/certsafari/q 90
    ```
-4. **Denemeyi nerede bulursun.** `POST /api/get-quizzes` tamamlanmış denemeleri
-   döndürmüyor (boş dizi). Tek liste sertifika ana sayfasındaki "Quiz History"
-   bölümü; oradaki "View quiz results" linki `?resume=<token>&view=results`
-   taşır ve token doğrudan `quiz_id`'dir. İlerleme de aynı sayfada:
-   Coverage / Mastery / Performance.
-5. **Doğru/yanlış için user_id gerekir.** `POST /api/get-quiz {quiz_id, user_id}`
-   → `data.question_attempts[]`: `question_id`, `response.selectedLetters`,
-   `is_correct`. user_id kullanıcının kendi tarayıcısındaki
-   `localStorage.certsafari_user_id` içinde; yanlış id `403` döner. Bu yüzden bu
-   adım Claude-in-Chrome ile kullanıcının Chrome profilinde çalıştırıldı
-   (yeni sekme aynı origin'in localStorage'ını görüyor).
+4. **Denemeleri `get-quizzes` listeler — doğru slug ile.** `POST /api/get-quizzes
+   {user_id, vendor, certificate}` tamamlanmış denemeler dâhil hepsini döndürür,
+   ama `certificate` alanı URL slug'ı **değil**:
+   `claude-certified-architect-foundations-ccar-f`. Slug'ı ya da `CCAR-F`'i
+   yollarsan `{"data":[]}` alırsın — 2026-08-25'te "bu uç boş dönüyor" diye
+   yazılmasının sebebi buydu, uç çalışıyor. Dönen kayıttaki `id` doğrudan
+   `quiz_id` yani `?resume=` token'ı; ayrıca `status`, `total_questions`,
+   `correct_answers`, `created_at` gelir.
+5. **user_id gerekir ama tarayıcı gerekmez.** `POST /api/get-quiz
+   {quiz_id, user_id}` → `data.question_attempts[]`: `question_id`,
+   `response.selectedLetters`, `is_correct`. user_id **bir kez** kullanıcının
+   tarayıcısından okunur (`localStorage.certsafari_user_id` içinde JSON,
+   `{userId, expiresAt, createdAt}`); ondan sonra `get-quiz`, `get-quizzes` ve
+   `study-notes/for-quiz` uçlarının hepsi düz curl + tarayıcı UA'sı ile çalışır.
+   Yanlış id `403` döner. `data/certsafari/fetch-attempt.sh` bu iki isteği yapar
+   ve user_id'yi `CERTSAFARI_USER_ID` ortam değişkeninden okur — hiçbir dosyaya
+   yazılmaz.
+
+   ```bash
+   CERTSAFARI_USER_ID=<uuid> bash data/certsafari/fetch-attempt.sh <quizId> data/certsafari
+   ```
+5b. **Kullanıcının kendi notları.** Site soru başına "study note" tutuyor.
+   `POST /api/study-notes/for-quiz {user_id, quiz_id}` → `notes[]`:
+   `question_id`, `question_number`, `question`, `domain`, `subdomain`, `body`,
+   `updated_at`, `is_active`, `successor_question_id`. Uç **deneme başına**
+   çalışıyor, "hepsini ver" diye bir uç yok — her `quiz_id` için tek tek çekilir.
+   Yazma ucu `POST /api/study-notes/upsert`; bu depo yalnızca okur.
 6. **Şık harfleri kanoniktir, ekrandaki sıra değil.** Sınav "Random Order"
    çalıştığı için ekranda gördüğün harf ile API'nin harfi tutmaz;
    `selectedLetters` ve `correct_answers` aynı (API) harf uzayındadır.
@@ -114,13 +130,42 @@ Adres: `https://www.certsafari.com/anthropic/claude-certified-architect-foundati
    `**kalın**` gönderiyor. Banka `innerHTML` ile çizdiği için merge sırasında
    önce kaçırılır sonra `<code>`/`<b>`'ye çevrilir.
 
+9. **Yaşam döngüsü alanları.** Soru yanıtı `is_active` ve `successor_question_id`
+   taşıyor: CertSafari soruları emekliye ayırıp yerlerine yenisini koyuyor
+   (ör. `65345` → `68251`). Emekli kayıt **elenmez** — denemede görülen metin
+   odur — ama `stale: 1` + `successor` ile işaretlenir. 2–6 denemelerinde 99
+   sorunun 7'si böyleydi. `source_urls` / `option_urls` alanları da var ama bu
+   sertifikada hep boş; alıntı politikası değişmiyor.
+10. **Tekrarlar kaçınılmaz.** Havuz rastgele dağıtıyor, denemeler örtüşüyor.
+   Tekilleştirme `cs-<questionId>` üzerinden ve "ilk gören sahiplenir"
+   kuralıyla — bu yüzden exam numaraları kronolojik verilir, eski deneme küçük
+   numara alsın diye. Atlanan kayıtlar rapora basılır, sessizce yutulmaz.
+   Soru numarası (`q`) denemedeki gerçek sırayı korur, yani bir sınavın içinde
+   boşluklu olabilir: `E13·S9` platformdaki 9. sorudur.
+
+Hangi denemelerin işleneceği `data/certsafari/attempts.json` manifestinde yazar:
+
+```json
+[{ "exam": 9,  "quizId": "K61jtZxsjC3BKZK", "n": 10, "label": "…" }, …]
+```
+
 Birleştirme ve gömme:
 
 ```bash
-node data/certsafari/merge-into-raw.mjs           # exam 7'yi bank-raw.json'a yazar
+# soru gövdeleri — deneme başına bir kez
+bash data/certsafari/scrape.sh <quizId> data/certsafari/q<exam> <n>
+# senin cevapların + notların — deneme başına bir kez
+CERTSAFARI_USER_ID=<uuid> bash data/certsafari/fetch-attempt.sh <quizId> data/certsafari
+# manifestteki tüm sınavları tazeler, tekrarları eler, notları bağlar
+node data/certsafari/merge-into-raw.mjs
 BANK_PASSWORD="$(head -1 password.txt)" node scripts/build-bank.mjs
 node scripts/validate.mjs
 ```
+
+`merge-into-raw.mjs` ayrıca gözden geçirmek için iki dosya yazar:
+`wrong-new.json` (her yanlış: hangi şıkkı işaretledin, doğrusu ne, bankada nerede)
+ve `notes-merged.json` (not bağlanan her soru). Bir not bankada karşılık bulamazsa
+betik **durur** — sessizce düşmez.
 
 Diğer uçlar: `/api/questions`, `/api/quiz-question-lifecycle`,
 `/api/update-quiz-progress`, `/api/saved-questions`. Site Next.js; uç nokta

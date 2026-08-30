@@ -212,7 +212,9 @@ if (js && errors.length === 0) {
         if (ex.correct + ex.wrong > ex.total) {
           fail(`${at}: correct+wrong (${ex.correct + ex.wrong}) > total (${ex.total}).`);
         }
-        const counted = M_BUILTIN.filter(m => String(m.exam) === String(num)).length;
+        /* `hit` kayıtları yanlış değil: doğru cevaplanmış ama not düşülmüş
+           sorular. Arayüzdeki "yanlış" sayaçları da bunları dışarıda bırakır. */
+        const counted = M_BUILTIN.filter(m => String(m.exam) === String(num) && !m.hit).length;
         if (counted !== ex.wrong) {
           warn(`${at}: wrong=${ex.wrong} ama ${counted} kayıt var. Kasıtlıysa sorun yok.`);
         }
