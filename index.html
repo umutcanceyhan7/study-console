@@ -807,35 +807,9 @@ const CONCEPTS = {
 /* Study notes — practical rules compiled from the documentation */
 const NOTES = [
   {
-    id: "prompt-caching", title: "Prompt Caching — Practical Rules", topic: "ctx", domain: 5, tasks: [], concept: "caching", icon: "▤",
-    summary: "Best practices for effective caching and scenario-based optimization — straight from the official documentation.",
-    source: ["Anthropic Docs — Prompt caching", "https://platform.claude.com/docs/en/build-with-claude/prompt-caching"],
-    sections: [
-      { id: "best", h: "Best practices for effective caching", html: `
-        <ul>
-          <li>Start with <b>automatic caching</b> for multi-turn conversations — it manages breakpoints for you.</li>
-          <li>Use <b>explicit block-level breakpoints</b> when you need to cache sections that change at different rates.</li>
-          <li>Cache content that is <b>stable and reused</b>: system instructions, background knowledge, large context, frequently used <b>tool definitions</b>.</li>
-          <li>Place cached content at the <b>beginning</b> of the prompt for best performance.</li>
-          <li>Use breakpoints strategically to separate different cacheable prefix sections.</li>
-          <li>Put the breakpoint on the <b>last block that stays identical across requests</b>. With a static prefix plus a variable suffix (timestamp, per-request context, incoming message), the breakpoint belongs at the <b>end of the prefix</b>, never inside the changing block.</li>
-          <li>Analyze <b>cache hit rates</b> regularly and adjust your strategy as needed.</li>
-        </ul>` },
-      { id: "usecases", h: "Optimizing for different scenarios", html: `
-        <ul>
-          <li><b>Conversational agents:</b> reduce cost and latency for extended conversations, especially those with long instructions or uploaded documents.</li>
-          <li><b>Coding assistants:</b> improve autocomplete and codebase Q&amp;A by keeping a relevant section or summary of the codebase in the prompt.</li>
-          <li><b>Large document processing:</b> embed long-form material, including images, into the prompt without increasing response latency.</li>
-          <li><b>Detailed instruction sets:</b> share extensive lists of instructions, procedures, and examples. Developers usually include a couple of examples; with caching you can include <b>20+ diverse, high-quality examples</b> and get better performance.</li>
-          <li><b>Agentic tool use:</b> boost performance in scenarios with many tool calls and iterative code changes, where each step normally requires a new API call.</li>
-          <li><b>Talking to long-form content:</b> books, papers, documentation, podcast transcripts — embed the entire document and let users ask questions about it.</li>
-        </ul>` },
-    ],
-  },
-  {
-    id: "mcp-primitives", title: "MCP Primitives — The Parts and Who Controls Them", topic: "tool", domain: 2, tasks: [], concept: "mcp", icon: "⚙",
-    summary: "Every MCP building block: server and client primitives, base protocol utilities, and the transport layer — who owns it, who controls it, which method. From the official MCP documentation (spec 2025-11-25).",
-    source: ["Model Context Protocol — Concepts", "https://modelcontextprotocol.io/docs/learn/server-concepts"],
+    id: "mcp-primitives", title: "MCP Primitives — The Parts and Who Controls Them", topic: "tool", domain: 2, tasks: ["2.1", "2.4"], concept: "mcp", icon: "⚙",
+    summary: "Every MCP building block: server and client primitives, base protocol utilities, and the transport layer — who owns it, who controls it, which method. This is the model the exam tests, spec revision 2025-11-25. The current revision (2026-07-28) has moved underneath it: three primitives are deprecated and the initialize handshake is gone. Both are here; the divergences are in their own section. Checked 1 Sep 2026.",
+    source: ["Model Context Protocol — Understanding MCP servers", "https://modelcontextprotocol.io/docs/learn/server-concepts#core-server-features"],
     sections: [
       { id: "server", h: "Server-side primitives (server exposes to client)", html: `
         <ul>
@@ -843,33 +817,57 @@ const NOTES = [
           <li><b>Resources</b> — <b>application-controlled</b>: passive, <b>read-only</b> data sources (file contents, DB schema, API documentation). The model does not invoke them — the host decides how to use them. Fields: <code>uri</code> (e.g. <code>file:///doc.md</code>), <code>name</code>, <code>mimeType</code>. Methods: <code>resources/list</code>, <code>resources/read</code>, <code>resources/subscribe</code>.</li>
           <li><b>Resource Templates</b> — <b>application-controlled</b>: parameterized/dynamic resource URIs, e.g. <code>travel://activities/{city}/{category}</code>. Fields: <code>uriTemplate</code>, <code>name</code>, <code>mimeType</code>. Method: <code>resources/templates/list</code>. Supports argument completion (autocomplete).</li>
           <li><b>Prompts</b> — <b>user-controlled</b>: pre-built, reusable, parameterized instruction templates (surfaced as slash commands, command-palette entries, or buttons). The user must trigger them explicitly. Fields: <code>name</code>, <code>description</code>, <code>arguments</code>. Methods: <code>prompts/list</code>, <code>prompts/get</code>.</li>
-        </ul>` },
+        </ul>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/docs/learn/server-concepts#core-server-features" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Docs, Understanding MCP servers, "Core Server Features" (relevant section) — the tools / resources / prompts split and who controls each <span aria-hidden="true">↗</span></a></p>` },
       { id: "client", h: "Client-side primitives (client exposes to server)", html: `
+        <p>The documentation names exactly three client features. <b>Two of the three are deprecated in the current revision</b> — see the divergence section below; the exam still tests them as live.</p>
         <ul>
           <li><b>Sampling</b> — <b>user/application-controlled (human-in-the-loop)</b>: the server requests an LLM completion through the client, which keeps the server model-independent. Fields: <code>messages</code>, <code>modelPreferences</code> (<code>hints</code>, <code>costPriority</code>, <code>speedPriority</code>, <code>intelligencePriority</code>), <code>systemPrompt</code>, <code>maxTokens</code>. Method: <code>sampling/createMessage</code>.</li>
-          <li><b>Elicitation</b> — <b>user-controlled</b>: the server asks the user for <b>structured information</b> during an interaction (e.g. confirm a booking). Fields: <code>message</code>, <code>requestedSchema</code>. Method: <code>elicitation/create</code>. <b>Never asks for passwords or API keys.</b></li>
+          <li><b>Elicitation</b> — <b>user-controlled</b>: the server asks the user for <b>structured information</b> during an interaction (e.g. confirm a booking). Fields: <code>message</code>, <code>requestedSchema</code>. Method: <code>elicitation/create</code>. <b>Never asks for passwords or API keys.</b> The only one of the three that is not deprecated.</li>
           <li><b>Roots</b> — <b>application/user-controlled</b>: the client tells the server which filesystem directories to focus on. Only the <code>file://</code> scheme. <b>Not a security boundary</b> — it is a coordination/scoping mechanism (the server "SHOULD respect" it, not "MUST enforce"). Notification: <code>roots/list_changed</code>.</li>
-          <li><b>Logging</b> — <b>application-controlled</b>: the server sends log messages to the client for debugging and monitoring.</li>
-        </ul>` },
+        </ul>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/docs/learn/client-concepts#core-client-features" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Docs, Understanding MCP clients, "Core Client Features" (relevant section) — the table lists Elicitation, Roots and Sampling, and nothing else <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none"><b>Correction to a common study-note shape, this one included until now:</b> <b>Logging is not a client primitive.</b> The client-features table names only the three above; logging is a <i>server</i> utility (server sends log messages to the client) and the deprecation registry files it under <code>/specification/2026-07-28/server/utilities/logging</code>. It has been moved to the base-protocol section below.</p>` },
       { id: "base", h: "Base protocol and utilities", html: `
         <ul>
-          <li><b>Lifecycle and capability negotiation</b>: the connection opens with <code>initialize</code> (exchanging <code>protocolVersion</code>, <code>capabilities</code>, <code>clientInfo</code>/<code>serverInfo</code>), followed by <code>notifications/initialized</code>. The protocol is stateful.</li>
+          <li><b>Lifecycle and capability negotiation</b>: in the revision the exam tests, the connection opens with <code>initialize</code> (exchanging <code>protocolVersion</code>, <code>capabilities</code>, <code>clientInfo</code>/<code>serverInfo</code>), followed by <code>notifications/initialized</code>, and the protocol is <b>stateful</b>. <b>This is the part that has changed most</b> — see the divergence section.</li>
           <li><b>Notifications</b>: JSON-RPC messages without an <code>id</code> and without a response; used for real-time updates (e.g. <code>*/list_changed</code>).</li>
           <li><b>Progress</b> (long operations) · <b>Cancellation</b> (abort an in-flight request) · <b>Ping</b> (liveness) · <b>Pagination</b> (for <code>*/list</code>).</li>
           <li><b>Completion / Autocomplete</b>: value suggestions for prompt arguments and resource-template URIs.</li>
+          <li><b>Logging</b> — a <b>server</b> utility: the server sends log messages to the client for debugging and monitoring. Deprecated in the current revision.</li>
           <li><b>Configuration</b> · <b>Error reporting</b>.</li>
           <li><b>Tasks</b> (<b>experimental</b>): a durable async execution wrapper for expensive or multi-step work — deferred results and status tracking.</li>
-        </ul>` },
+        </ul>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/docs/learn/architecture#data-layer-protocol" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Docs, Architecture overview, "Data Layer Protocol" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
       { id: "transport", h: "Transport layer", html: `
         <ul>
           <li>Foundation: <b>JSON-RPC 2.0</b>.</li>
           <li><b>stdio</b>: standard input/output streams; <b>local</b>, same machine, typically a <b>single client</b>.</li>
           <li><b>Streamable HTTP</b>: HTTP POST plus optional SSE; <b>remote</b> servers, <b>multiple clients</b>. Bearer token / API key / custom header; <b>OAuth</b> is the recommended auth approach.</li>
-        </ul>` },
+          <li><b>HTTP+SSE</b> — the older two-endpoint transport. Deprecated since <code>2025-03-26</code>, with Streamable HTTP as the migration path. If an option offers it as a current choice, it is wrong.</li>
+        </ul>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Specification 2026-07-28, "stdio" transport (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Specification 2026-07-28, "Streamable HTTP" transport (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "divergence", h: "Where the current spec has moved past the exam — revision 2026-07-28", html: `
+        <p>Everything above is the model the blueprint and the practice exams test. The protocol has since shipped a revision that contradicts three parts of it. Both belong in your head, labelled: <b>answer the exam's model on the exam, and know that a real implementation written today would look different.</b></p>
+        <table>
+          <thead><tr><th>Claim above</th><th>Current specification (<code>2026-07-28</code>)</th></tr></thead>
+          <tbody>
+            <tr><td><b>Sampling</b> is a live client primitive</td><td><b>Deprecated</b> (SEP-2577). Migration path: "Integrate directly with LLM provider APIs." Earliest removal: first revision released on or after 2027-07-28</td></tr>
+            <tr><td><b>Roots</b> is a live client primitive</td><td><b>Deprecated</b> (SEP-2577). Migration path: "Pass directories or files via tool parameters, resource URIs, or server configuration"</td></tr>
+            <tr><td><b>Logging</b> is a primitive</td><td><b>Deprecated</b> (SEP-2577) — and it was always a <i>server</i> utility, not a client one. Migration path: <code>stderr</code> for stdio transports, OpenTelemetry for observability</td></tr>
+            <tr><td>The connection opens with an <code>initialize</code> handshake and the protocol is <b>stateful</b></td><td>No handshake. MCP is described as a <b>stateless</b> protocol: every request carries its protocol version and capabilities in <code>_meta</code>, and servers advertise support through a mandatory <code>server/discover</code> request. The spec now calls handshake-based revisions (<code>2025-11-25</code> and earlier) <b>Legacy</b> and per-request-metadata revisions <b>Modern</b></td></tr>
+          </tbody>
+        </table>
+        <p><b>One addition rather than a contradiction:</b> elicitation now has two modes — <b>Form mode</b> (the client builds an input form from a schema) and <b>URL mode</b> (the user opens a URL out of band, so the data never passes through the client, which is what makes it suitable for credential entry and OAuth). Requests are delivered through the Multi Round-Trip Requests pattern: the server answers a <code>tools/call</code> with an <code>InputRequiredResult</code> carrying <code>elicitation/create</code> requests, and the client retries the original call with the collected <code>inputResponses</code>.</p>
+        <p><b>What this means for an exam item:</b> the blueprint's technology list and every practice question predate this revision, so "Sampling lets a server request a completion through the client" is still the keyed answer. Do not correct the exam. Do notice that a deprecation registry exists — deprecated is not removed, and all four rows above remain part of the specification until at least 2027-07-28.</p>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/specification/2026-07-28/deprecated" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Specification 2026-07-28, "Deprecated Features" registry — the table of every deprecated feature with its SEP, migration path and earliest removal <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/specification/2026-07-28/basic/lifecycle#terminology" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Specification 2026-07-28, Versioning and Compatibility, "Terminology" (relevant section) — Modern versus Legacy, and "There is no negotiation handshake" <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://modelcontextprotocol.io/docs/2026-07-28/learn/client-concepts#elicitation" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — MCP Docs 2026-07-28, "Elicitation" (relevant section) — Form mode, URL mode, and the MRTR delivery pattern <span aria-hidden="true">↗</span></a></p>` },
       { id: "exam", h: "Exam traps — who controls what?", html: `
         <ul>
           <li>Do not mix up the control model: <b>Tools = model</b>, <b>Resources/Templates = application</b>, <b>Prompts = user</b>.</li>
-          <li>Side split: Tools/Resources/Templates/Prompts are <b>server</b> primitives; Sampling/Elicitation/Roots/Logging are <b>client</b> primitives.</li>
+          <li>Side split: Tools/Resources/Templates/Prompts are <b>server</b> primitives; Sampling/Elicitation/Roots are <b>client</b> primitives — exactly three, and <b>Logging is not one of them</b> (it is a server utility). An option that lists four client primitives is naming one wrongly.</li>
           <li><b>Resources are passive and read-only</b> (they supply context) — <b>Tools take action</b>. The exam likes to reverse this.</li>
           <li>TS SDK: <code>server.tool(name, zodSchema, async handler)</code>; the handler <b>must return a <code>content</code> array</b> (see the related mistake e2q4). <code>addTool</code>/<code>register</code>/<code>createTool</code> are invented names.</li>
           <li><b>Roots</b> is not a security boundary; it is only a <code>file://</code> scope hint.</li>
@@ -884,7 +882,7 @@ const NOTES = [
             <tr><td>Sampling</td><td>Client</td><td>User/App (HITL)</td><td><code>sampling/createMessage</code></td></tr>
             <tr><td>Elicitation</td><td>Client</td><td>User</td><td><code>elicitation/create</code></td></tr>
             <tr><td>Roots</td><td>Client</td><td>App/User</td><td><code>roots/list_changed</code></td></tr>
-            <tr><td>Logging</td><td>Client</td><td>Application</td><td>(log message)</td></tr>
+            <tr><td>Logging</td><td><b>Server</b> (utility, not a primitive)</td><td>Application</td><td><code>notifications/message</code></td></tr>
           </tbody>
         </table>` },
     ],
@@ -953,7 +951,7 @@ const NOTES = [
           <li>Explore and the <b>Plan</b> subagent both skip your CLAUDE.md files and the parent session's git status, to keep research fast and cheap. Every other subagent loads both.</li>
           <li>You are already using a subagent in plan mode without asking: when Claude needs to understand the codebase while planning, it delegates research to the built-in <b>Plan</b> subagent, so exploration output lands in a separate context window.</li>
           <li>Invoke it in words — <i>"use subagents to investigate X"</i>. The canonical isolation case in the docs is verbose output: <i>"Use a subagent to run the test suite and report only the failing tests with their error messages."</i></li>
-          <li><b>The counter-warning matters as much as the rule.</b> Results return to the main conversation; many subagents each returning detailed findings consume significant context themselves. Isolation is not free, and a subagent spawned for discovery you did not need is a pure loss.</li>
+          <li><b>Isolation is not free</b>, and a subagent spawned for discovery you did not need is a pure loss — the documented counter-warning, and the delegate-then-compact order it implies, are in <a class="pill" href="#/note/codebase-context">Large Codebase Exploration</a>.</li>
         </ul>
         <p class="srcline"><a href="https://code.claude.com/docs/en/sub-agents#built-in-subagents" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Built-in subagents" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
       { id: "combined", h: "Combining the two — plan to investigate, direct to implement", html: `
@@ -1020,7 +1018,7 @@ const NOTES = [
     ],
   },
   {
-    id: "simplest-first", title: "Simplest Solution First — The Over-Orchestration Trap", topic: "agent", domain: 1, tasks: [], concept: "simplicity", icon: "◈",
+    id: "simplest-first", title: "Simplest Solution First — The Over-Orchestration Trap", topic: "agent", domain: 1, tasks: [], crosscut: true, concept: "simplicity", icon: "◈",
     summary: "When two options both do the job, the one with fewer moving parts wins. Verified against Anthropic's own engineering post (12 Aug 2026).",
     source: ["Anthropic Engineering — Building effective agents", "https://www.anthropic.com/engineering/building-effective-agents"],
     sections: [
@@ -1042,15 +1040,9 @@ const NOTES = [
             <tr><td>Q57</td><td>Direct execution plus an Explore subagent</td><td>Direct execution alone</td></tr>
           </tbody>
         </table>` },
-      { id: "test", h: "Elimination test — apply it to an option in 20 seconds", html: `
-        <ol>
-          <li><b>Which concrete failure does this mechanism prevent?</b> If you cannot name the failure, the option is decoration — eliminate it.</li>
-          <li><b>Can it be solved one layer lower?</b> An option that solves at a higher layer (hook, post-processing, extra agent) what could be solved in the source, the schema, or the tool contract is wrong.</li>
-          <li><b>Is a guarantee required?</b> If yes, it must be code / hook / permission rule; the model's self-reported confidence is not a guarantee.</li>
-          <li><b>What does the extra agent or handoff cost?</b> Every boundary adds context loss and latency. No named benefit, no new boundary.</li>
-        </ol>
-        <p class="small quiet">Generalized beyond simplicity — the other five axes and the five distractor kinds —
-          in the <a class="pill" href="#/note/distractor-axes">Distractor Axes</a> note.</p>` },
+      { id: "test", h: "The one question this note contributes to the elimination order", html: `
+        <p><b>Which concrete failure does this mechanism prevent?</b> If you cannot name the failure, the option is decoration — eliminate it. That is the simplicity axis in one line, and it is the last question of a five-step order rather than a procedure of its own.</p>
+        <p>The full order — strike invented spellings, count what actually solves the problem, ask whether a guarantee is required, ask whether it can be solved one layer lower, then ask what the extra mechanism buys — lives in <a class="pill" href="#/note/distractor-axes">Distractor Axes</a>, together with the other five axes and the five kinds of wrong option. Run it there; this note is the depth behind step five.</p>` },
       { id: "exceptions", h: "Where complexity is justified", html: `
         <p>Simplicity does not mean "do everything in one pass". Extra structure is the <b>correct</b> answer in these four cases:</p>
         <ul>
@@ -1064,7 +1056,7 @@ const NOTES = [
     ],
   },
   {
-    id: "distractor-axes", title: "Distractor Axes — Why the Other Working Option Loses", topic: "agent", domain: 1, tasks: [], concept: "simplicity", icon: "◈",
+    id: "distractor-axes", title: "Distractor Axes — Why the Other Working Option Loses", topic: "agent", domain: 1, tasks: [], crosscut: true, concept: "simplicity", icon: "◈",
     summary: "Two options solve the problem; one wins on a named axis. This is the vocabulary for saying which axis, and the condition that would flip the answer back.",
     source: ["Anthropic Engineering — Building effective agents, \"When (and when not) to use agents\"", "https://www.anthropic.com/engineering/building-effective-agents#when-and-when-not-to-use-agents"],
     related: [
@@ -1271,7 +1263,7 @@ const NOTES = [
           <li><b>Precedence is explicit:</b> <code>deny</code> &gt; <code>defer</code> &gt; <code>ask</code> &gt; <code>allow</code>. If any hook returns <code>deny</code>, the operation is blocked regardless of the other hooks.</li>
           <li><b>Exit code 2 is a blocking error.</b> On events that can block, exit 2 blocks whether or not you print JSON — even a JSON <code>permissionDecision</code> of <code>"allow"</code> cannot override it. The documentation states it plainly: exit 2's block is the one outcome JSON cannot override.</li>
           <li><b>PostToolUse</b> intercepts the result <b>before the model processes it</b>: <code>additionalContext</code> appends information to the tool result, and <code>updatedToolOutput</code> replaces the output itself. This is where heterogeneous data normalization belongs (Unix timestamps, ISO 8601, numeric status codes) — instead of telling the model to normalize, you normalize what reaches the model.</li>
-          <li>In the Agent SDK, hooks are <b>callback functions</b> passed in <code>options.hooks</code>; Claude Code additionally supports shell command, HTTP, MCP tool, prompt, and agent hook types. Same mechanism, different carrier.</li>
+          <li><b>Carrier is not mechanism.</b> The same hook can arrive as a shell command, an HTTP call, an MCP tool, a prompt or an agent, and the Agent SDK spells it as a callback instead — the five handler types and the SDK-versus-Claude-Code parity table are in <a class="pill" href="#/note/hook-orchestration">Orchestration Hooks</a>.</li>
         </ul>
         <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#exit-code-2" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Hooks reference, "Exit code 2" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
       { id: "gate", h: "Prerequisite gates — enforce ordering in code, not in the prompt", html: `
@@ -1292,18 +1284,10 @@ const NOTES = [
         </ul>
         <p>On the exam, "use a hook" is not a complete answer; <b>which hook type</b> carries the distinction. Wiring a monetary threshold to a prompt hook puts enforcement back in the prompt layer, only more expensively.</p>
         <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#prompt-based-hooks" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Hooks reference, "Prompt-based hooks" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
-      { id: "selection", h: "Four mechanisms — which one for which job", html: `
-        <table>
-          <thead><tr><th>Mechanism</th><th>When it loads</th><th>What it does</th><th>Use for</th></tr></thead>
-          <tbody>
-            <tr><td><code>CLAUDE.md</code></td><td>Every session</td><td>Soft guidance (context)</td><td>Project facts needed in every session</td></tr>
-            <tr><td><code>.claude/rules/</code></td><td>Every session, or only when matching paths are read</td><td>Soft guidance (context)</td><td>Topic- or area-specific instructions, scoped with <code>paths:</code></td></tr>
-            <tr><td>Skills</td><td>On demand</td><td>Structured procedure — still soft</td><td>Multi-step workflows invoked intentionally</td></tr>
-            <tr><td>Hooks</td><td>Lifecycle events</td><td><b>Hard enforcement</b></td><td>Allow/deny rules, mandatory approvals, formatters</td></tr>
-          </tbody>
-        </table>
-        <p>The discriminating question is one line: <b>must this run whether or not the model decides to?</b> If yes, it is a hook. If no, it is context.</p>
-        <p class="srcline none">Source: <code>exam-preparation-guide.md</code> §10 "CLAUDE.md vs rules vs skills vs hooks" (repo root, lines 1387-1397). Consistent with the official docs; no single documentation page compares all four in one table.</p>` },
+      { id: "selection", h: "Which mechanism — one question", html: `
+        <p><b>Must this run whether or not the model decides to?</b> If yes, it is a hook. If no, it is context — and which <i>kind</i> of context is a separate decision, made on when the text should enter the window rather than on how important it is.</p>
+        <p>That second decision has one home: the six-row selection table in <a class="pill" href="#/note/memory-surfaces">Memory Surfaces</a> ranks <code>CLAUDE.md</code>, path-scoped and unscoped <code>.claude/rules/</code>, skills, slash commands and hooks against each other, with the scenario wording that picks each. Read it there rather than in two half-versions.</p>
+        <p class="srcline none">Source: <code>exam-preparation-guide.md</code> §10 "CLAUDE.md vs rules vs skills vs hooks" (repo root, lines 1387-1397). Consistent with the official docs; no single documentation page compares all of them in one table.</p>` },
       { id: "exam", h: "Exam reflex", html: `
         <ul>
           <li>If the scenario says <b>"guaranteed", "always", "never", "compliance", "auditable"</b> → programmatic enforcement. <b>"prefer", "usually", "encourage"</b> → prompt layer.</li>
@@ -1414,11 +1398,9 @@ const NOTES = [
         <p>The study guide explains why "resume the old session and add an instruction to prefer the most recent tool results" is the wrong option: <b>the agent often references old tool results regardless of instructions</b>, especially when the older results are more detailed than the newer ones. Filtering <code>tool_result</code> messages out of the resumed history is also bad — earlier turns then reference data the model cannot see. Re-calling every previous tool at session start wastes calls on tools whose results may be irrelevant to the new question.</p>
         <p>A structured summary beats a prose summary: explicit fields (known IDs, completed steps, open gaps, a "fresh lookup required" flag) leave no ambiguity.</p>
         <p class="srcline none">Source: <code>exam-preparation-guide.md</code> §5 "Returning Users and Stale Data" (repo root, lines 737-757) and §8 "State Persistence" (lines 1096-1115). PDF counterpart: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> p.8, Task Statement 1.7 — "Why starting a new session with a structured summary is more reliable than resuming with stale tool results".</p>` },
-      { id: "toolkit", h: "The toolkit — which flag does what", html: `
+      { id: "toolkit", h: "What resumption does not bring back", html: `
+        <p>Which flag selects which session — <code>--resume</code> for a specific one, <code>--continue</code> for the latest, <code>--fork-session</code> to branch from a shared analysis baseline, <code>--session-id</code> for a known UUID, plus the SDK spellings and the invented flag names the exam offers — is on the <a class="pill" href="#/usage" onclick="return jumpTo('session-resume')">session resumption cheat-sheet card</a>. What follows is the part the card does not carry: <b>what a resume silently fails to restore.</b></p>
         <ul>
-          <li><b>Named resumption:</b> <code>--resume &lt;session-name&gt;</code> continues a specific prior conversation. <code>--continue</code> instead finds the <b>most recent</b> session in the directory and needs no ID tracking.</li>
-          <li><b>SDK equivalents:</b> <code>resume=&lt;session_id&gt;</code> (a specific session) and <code>continue_conversation=True</code> / <code>continue: true</code> (most recent session).</li>
-          <li><b>Fork:</b> <code>fork_session=True</code> / <code>forkSession: true</code> (<code>--fork-session</code> on the CLI) creates a new session starting from a <b>copy</b> of the original's history; the original's ID and history stay unchanged. This is how you explore <b>divergent approaches from a shared analysis baseline</b> — for example comparing two refactoring strategies branched off the same codebase analysis.</li>
           <li><b>Resuming a long session:</b> on Pro or Max plans, resuming a session that has been inactive for more than about an hour and is over 100,000 tokens opens a dialog with three choices: <b>resume from summary</b> (runs <code>/compact</code>, later requests carry the summary), <b>resume the full session as-is</b>, or <b>don't ask again</b>. The prompt cache has expired by then, so the next request reprocesses the full history once whichever option you pick.</li>
           <li><b>Not restored:</b> <code>--mcp-config</code>, <code>--settings</code>, <code>--plugin-dir</code>, <code>--fallback-model</code>, and directories added with <code>--add-dir</code> must be passed again on resume. The <code>plan</code> and <code>bypassPermissions</code> permission modes are never restored.</li>
         </ul>
@@ -1523,18 +1505,8 @@ paths:
         <p><b>The trap inside the trap:</b> <i>task-scoped</i> and <i>path-scoped</i> are not interchangeable. A code-review checklist is task-scoped — it belongs in a skill, slash command, or subagent. Putting it in <code>.claude/rules/</code> with a <code>paths:</code> glob that approximates "files under review" makes it fire every time Claude touches those files <b>outside</b> a review too. Path scoping triggers on "Claude read a matching file", never on "the user is doing X".</p>
         <p class="srcline none">Source: <code>exam-preparation-guide.md</code> §"Prefer scoped memory" (repo root, lines 1405-1420). The current documentation makes the skills-vs-rules distinction but does not spell out the task-vs-path failure mode in these terms.</p>` },
       { id: "frontmatter", h: "Skill frontmatter — context: fork, allowed-tools, argument-hint", html: `
-        <p>Task Statement 3.2 names three frontmatter fields. All three exist in the current frontmatter reference, but one of them does the opposite of what the exam guide describes.</p>
-        <pre><code>---
-name: audit-deps
-description: Audit dependency licenses and report conflicts
-argument-hint: [package-name]
-context: fork
-agent: Explore
-allowed-tools: Bash(npm ls *) Read Grep
----
-
-Audit the dependency tree for $ARGUMENTS. Report license conflicts
-and transitive duplicates. Return only the conflict table.</code></pre>
+        <p>Task Statement 3.2 names three frontmatter fields. All three exist in the current frontmatter reference, but one of them does the opposite of what the exam guide describes — that divergence is why this section exists.</p>
+        <p>The file layout and the exact key spellings (hyphenated, folder-not-file, and the camelCase lookalikes the exam offers) are on the <a class="pill" href="#/usage" onclick="return jumpTo('skill-frontmatter')">skill frontmatter cheat-sheet card</a>. What follows is behaviour, not spelling.</p>
         <ul>
           <li><b><code>context: fork</code></b> — runs the skill in a forked subagent. <b>The SKILL.md content becomes the prompt that drives the subagent, and it does not see your conversation history.</b> This is the answer whenever the scenario says a skill's output is <i>polluting the main conversation</i>: verbose codebase analysis, exploratory brainstorming, anything whose intermediate reasoning you do not want back.</li>
           <li><b>Current-docs detail the guide predates:</b> a forked skill runs in the <b>background</b> by default and its result arrives when it completes; set <code>background: false</code> to wait inside the invoking turn. <code>agent:</code> picks the subagent type. A backgrounded fork gets the narrower background-subagent tool set, and its edits fall outside checkpoints, so <code>/rewind</code> will not undo them.</li>
@@ -1822,23 +1794,15 @@ audit  = {"tool_use_id": calls[0].id, "stop_reason": resp.stop_reason}</code></p
         </ul>
         <p class="srcline"><a href="https://platform.claude.com/docs/en/build-with-claude/structured-outputs#why-use-structured-outputs" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, Structured outputs, "Why use structured outputs" (relevant section) <span aria-hidden="true">↗</span></a></p>
         <p class="srcline none">Token-weight figure: <code>exam-preparation-guide.md</code> §1 "Structured Outputs and Tool Use as Output Control" (repo root, line 64). The documentation states that schemas count as input tokens but does not publish the 2,500-token example.</p>` },
-      { id: "choice", h: "Reminder — the four tool_choice values", html: `
-        <table>
-          <thead><tr><th>Value</th><th>Guarantee</th><th>Use it for</th></tr></thead>
-          <tbody>
-            <tr><td><code>auto</code></td><td><b>None.</b> Claude may call a tool or answer in prose. Default when <code>tools</code> are provided</td><td>General agents where the tool call is optional</td></tr>
-            <tr><td><code>any</code></td><td>Claude <b>must</b> call one of the provided tools, but picks which</td><td><b>Several extraction schemas, unknown document type</b> — the exam's canonical case</td></tr>
-            <tr><td><code>tool</code></td><td>Claude must call <b>that named</b> tool</td><td>A pipeline stage that must emit one schema before enrichment</td></tr>
-            <tr><td><code>none</code></td><td>Claude <b>cannot</b> call tools. Default when no <code>tools</code> are provided</td><td>A pure-text step, or a step where tools are unsafe</td></tr>
-          </tbody>
-        </table>
+      { id: "choice", h: "The one tool_choice decision this task statement makes", html: `
+        <p>4.3 does not ask you to recite the four values; it asks <b>which one guarantees the schema you designed actually gets used.</b> The answer turns on a single distinction:</p>
         <ul>
-          <li><b><code>auto</code> plus "please use the tool" in the prompt is not a guarantee.</b> It is the same probabilistic layer as any other instruction; <code>any</code> is the code-level guarantee. This is the most repeated distractor in this task statement.</li>
-          <li><b><code>any</code> guarantees the call, not the payload.</b> Combine <code>tool_choice: {"type": "any"}</code> with <code>strict: true</code> on the tool definitions to guarantee both that a tool is called and that its input follows your schema.</li>
-          <li><b>Ordering tricks do not work.</b> Reordering tool definitions or asserting priority in the system prompt is unreliable; if a specific tool must run first, name it with <code>tool_choice: {"type": "tool", "name": "extract_metadata"}</code>.</li>
-          <li><b>Cost of switching:</b> changing <code>tool_choice</code> invalidates cached <i>message</i> blocks under prompt caching. Tool definitions and system prompts stay cached, but message content is reprocessed — so do not flip it per request out of habit.</li>
-          <li><b>Compatibility trap:</b> with <i>manual</i> extended thinking (<code>thinking: {type: "enabled"}</code>), <code>any</code> and <code>tool</code> are <b>not supported</b> and return an error; only <code>auto</code> and <code>none</code> work. Adaptive thinking — including models where thinking is on by default, such as Claude Opus 5 — does support forced tool use.</li>
+          <li><b>Several extraction schemas and an unknown document type → <code>any</code>.</b> Claude must call one of them but picks which — the exam's canonical case, because the whole point is that you do not know in advance which schema fits.</li>
+          <li><b>One schema that must be emitted before anything else happens → <code>tool</code>, named.</b> A pipeline stage that feeds enrichment downstream.</li>
+          <li><b><code>auto</code> plus "please use the tool" in the prompt is not a guarantee</b> — it is the same probabilistic layer as any other instruction. This is the most repeated distractor in this task statement, and it is the only one worth memorising as a reflex.</li>
+          <li><b><code>any</code> guarantees the call, not the payload.</b> Pair it with <code>strict: true</code> on the tool definitions to guarantee both.</li>
         </ul>
+        <p>The four values side by side, the wrong spellings the exam borrows from OpenAI, and the three consequences that trail forced selection — the prefilled assistant message, cache-invalidation on switching, and the manual-extended-thinking incompatibility — are on the <a class="pill" href="#/usage" onclick="return jumpTo('tool-choice')">tool_choice cheat-sheet card</a>. Read them there; this note only decides <i>which</i> to reach for.</p>
         <p class="srcline"><a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools#forcing-tool-use" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, Define tools, "Forcing tool use" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
       { id: "normalize", h: "Reminder — the schema constrains shape, the prompt constrains value form", html: `
         <p>This is the exam's last skill bullet under 4.3, and it is not a stylistic preference — it follows from what the grammar can and cannot express.</p>
@@ -2051,23 +2015,12 @@ needed to fix the errors listed above.</code></pre>
         <p>One structural note that belongs to 4.6 rather than to confidence: the pass that assigns the confidence should be an <b>independent instance</b> where possible. A model that just generated an answer carries its own reasoning context and is <i>less likely to question its own decisions in the same session</i> — which is why "add a self-review instruction" and "turn on extended thinking" are the weak options and "a second instance without the generator's context" is the strong one.</p>
         <p class="srcline"><a href="https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-hallucinations#advanced-techniques" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, Reduce hallucinations, "Advanced techniques" (relevant section) <span aria-hidden="true">↗</span></a></p>
         <p class="srcline none">Self-review limitation and the confidence-routing skill bullet: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (repo root) p.19, Task Statement 4.6. Calibration and stratified sampling: p.22, Task Statement 5.5, and <code>exam-preparation-guide.md</code> §4 "Confidence and Human Review" (lines 550-580).</p>` },
-      { id: "tension", h: "Reconciling the contradiction — 5.2 calls confidence unreliable, 4.6 and 5.5 use it", html: `
-        <p>Two task statements appear to say opposite things, and a question can be built on either side, so the reconciliation has to be explicit.</p>
-        <table>
-          <thead><tr><th></th><th>Task Statement 5.2</th><th>Task Statements 4.6 / 5.5</th></tr></thead>
-          <tbody>
-            <tr><td>Wording</td><td>"self-reported confidence scores are <b>unreliable proxies</b> for actual case complexity"</td><td>"<b>field-level</b> confidence scores <b>calibrated using labeled validation sets</b> for routing review attention"</td></tr>
-            <tr><td>What is being judged</td><td>The agent's own competence at a task it has <b>not finished</b></td><td>A <b>finished artifact</b> the model just produced, field by field</td></tr>
-            <tr><td>When</td><td>Mid-conversation, live</td><td>After the fact, in a verification pass</td></tr>
-            <tr><td>Calibrated?</td><td><b>No</b> — used raw as a trigger</td><td><b>Yes</b> — thresholds fitted to labeled data</td></tr>
-            <tr><td>Consequence of being wrong</td><td>A customer who needed a human does not get one</td><td>An item lands in the wrong review queue</td></tr>
-            <tr><td>Verdict</td><td>Do not escalate on it</td><td>Do route on it</td></tr>
-          </tbody>
-        </table>
-        <p>The reconciling principle: <b>a model can score a thing it has produced far better than it can score its own state while producing it.</b> Per-field confidence about a completed extraction is a property of an artifact you can hold up against ground truth; an agent's mid-conversation "I am 70% sure I can handle this" is a self-assessment with nothing to check it against, which is exactly why 5.2 pairs it with sentiment analysis as the other unreliable proxy. Escalation is therefore driven by <b>categorical triggers</b> — the customer asked for a human, the policy is silent or ambiguous, no meaningful progress is being made — not by a number the agent invented about itself.</p>
-        <p>The second half of the reconciliation is the word <b>calibrated</b>. An uncalibrated confidence field used as a control gate is a bug in both worlds; the same field, after you measure what each band actually predicts on a labeled set, becomes a legitimate prioritization signal. And even then it prioritizes scarce reviewer capacity — it never authorizes skipping review of a high-impact field.</p>
-        <p><a class="pill" href="#/note/escalation-ambiguity">Escalation &amp; Ambiguity (5.2)</a> <a class="pill" href="#/note/confidence-review">Confidence Calibration &amp; Human Review (5.5)</a></p>
-        <p class="srcline none">Source: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (repo root) p.20, Task Statement 5.2 Knowledge bullet 3, against p.19 Task Statement 4.6 Skills bullet 3 and p.22 Task Statement 5.5 Knowledge bullet 3. The two are not reconciled anywhere in the guide or in the product documentation; the distinction drawn here is derived from their differing scope, and the "useful only after calibration" rule comes from <code>exam-preparation-guide.md</code> §4 "Confidence and Human Review" (line 552).</p>` },
+      { id: "tension", h: "Why 4.6 may ask for confidence when 5.2 calls it unreliable", html: `
+        <p>4.6's verification pass asks the model to self-report confidence alongside each finding. Task Statement 5.2 calls self-reported confidence an unreliable proxy. Both are true, and the line between them is what this note's side of the seam depends on:</p>
+        <p><b>4.6 scores a finished artifact; 5.2 would be scoring a live situation.</b> A finding already exists and can be held against ground truth — dismissal rates, a labeled set — so the number becomes a measurement. An agent's mid-conversation "I am 70% sure I can handle this" has nothing to check it against.</p>
+        <p>Two consequences for the retry and self-correction machinery above: the score is a <b>prioritization signal, never an authorization to skip review</b> of a high-impact field, and it is worth nothing until calibrated — an uncalibrated confidence field wired to a control gate is a bug in both worlds.</p>
+        <p>The full three-way comparison, including 5.5 and the shipped Code Review effort dial that puts a knob on 4.6's behaviour, is in <a class="pill" href="#/note/confidence-granularity">Confidence Signals</a>. Escalation's own side is in <a class="pill" href="#/note/escalation-ambiguity">Escalation &amp; Ambiguity (5.2)</a>; the calibration procedure is in <a class="pill" href="#/note/confidence-review">Confidence Calibration &amp; Human Review (5.5)</a>.</p>
+        <p class="srcline none">Source: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (repo root) p.19, Task Statement 4.6 Skills bullet 3, against p.20 Task Statement 5.2 Knowledge bullet 3. The two are not reconciled anywhere in the guide or in the product documentation; the distinction drawn here is derived from their differing scope, and the "useful only after calibration" rule comes from <code>exam-preparation-guide.md</code> §4 "Confidence and Human Review" (line 552).</p>` },
       { id: "exam", h: "Exam reflex", html: `
         <ul>
           <li>"Developers dismiss a lot of findings — how do we find out why?" → add a <b>closed-enum <code>detected_pattern</code></b> field (optionally <code>rule_id</code>, <code>evidence</code>) and aggregate dismissals by it. The distractors are a <b>free-text reason box</b>, a <b>dismissal survey</b>, and "review a sample of dismissed findings manually" — the last one is what you do <i>after</i> the field exists, not instead of it.</li>
@@ -2349,18 +2302,9 @@ action is ready; would you like me to complete it or connect you to a specialist
           <li><b>A trained classifier (option C) fails on proportionality</b>, not on principle: it needs labeled data and ML infrastructure before prompt optimization has been tried. Compare the <a class="pill" href="#/note/simplest-first">Simplest Solution First</a> reflex — the cheapest change that addresses the root cause wins the "first step" question.</li>
           <li>What is left is the decision boundary itself, which is a <b>prompt</b> problem: explicit criteria plus contrasting examples. The guide backs the mechanism generally — when a system prompt has grown into long rule lists and behavior drifts, replacing chunks of rules with two or three contrasting examples typically restores adherence.</li>
         </ul>
-        <p><b>Reconciling this with 4.6 and 5.5, which do use confidence.</b> Task Statement 4.6 asks for verification passes where the model <b>self-reports confidence alongside each finding to enable calibrated review routing</b>, and 5.5 is built entirely on field-level confidence scores. Read together with 5.2's "self-reported confidence scores are unreliable proxies", that looks like a contradiction. It is not — three things differ:</p>
-        <table>
-          <thead><tr><th></th><th>5.2 — the unreliable version</th><th>4.6 / 5.5 — the usable version</th></tr></thead>
-          <tbody>
-            <tr><td>What is being scored</td><td>The agent's <b>own competence</b> on a live conversation whose difficulty it has not yet discovered</td><td>A <b>produced artifact</b> — a specific extracted field, a specific review finding — that already exists and can be checked</td></tr>
-            <tr><td>Granularity</td><td>One number for the whole turn</td><td><b>Per field, per finding</b>, attached to the item it describes</td></tr>
-            <tr><td>Calibration</td><td>None. The threshold is picked by intuition</td><td>Measured against a <b>labeled validation set</b>, bucketed by confidence band, document type, and field</td></tr>
-            <tr><td>Who computes the routing</td><td>The model gates itself</td><td>A <b>derived</b> <code>requires_review</code> flag, computed outside the model from the calibrated threshold</td></tr>
-          </tbody>
-        </table>
-        <p>So the rule is not "confidence is useless." It is: <b>a number is only a routing signal after you have measured what it means.</b> An uncalibrated self-rating mid-conversation is a vibe; a calibrated per-field score is a measurement. See <a class="pill" href="#/note/confidence-review">Confidence Calibration and Human Review</a> for the calibration procedure and <a class="pill" href="#/note/extraction-validation">Extraction Validation</a> for the artifact side.</p>
-        <p class="srcline none">Source: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (repo root) p.28, sample question 3 and its rationale paragraph; Task Statement 5.2 Knowledge bullet 3 (pp.20-21); Task Statement 4.6 Skills bullet 3 (p.19); Task Statement 5.5 (pp.22-23). Supporting: <code>exam-preparation-guide.md</code> §7 "Few-Shot Examples" (lines 829-842).</p>` },
+        <p><b>And yet 4.6 and 5.5 do use confidence.</b> That is not a contradiction with 5.2, and the item that turns on it is worth being able to answer in one sentence: <b>5.2 would be scoring a live situation the agent has not finished; 4.6 and 5.5 score a produced artifact that already exists and can be checked against labels.</b> So the rule is not "confidence is useless" — it is that <b>a number is only a routing signal after you have measured what it means.</b> An uncalibrated self-rating mid-conversation is a vibe; a calibrated per-field score is a measurement.</p>
+        <p>The three-way comparison across 4.6, 5.2 and 5.5 — granularity, who computes the routing, and the shipped Code Review effort dial that demonstrates 4.6's version — is in <a class="pill" href="#/note/confidence-granularity">Confidence Signals</a>. From there: <a class="pill" href="#/note/confidence-review">Confidence Calibration and Human Review</a> for the calibration procedure, <a class="pill" href="#/note/extraction-validation">Extraction Validation</a> for the artifact side.</p>
+        <p class="srcline none">Source: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (repo root) p.28, sample question 3 and its rationale paragraph; Task Statement 5.2 Knowledge bullet 3 (pp.20-21). Supporting: <code>exam-preparation-guide.md</code> §7 "Few-Shot Examples" (lines 829-842).</p>` },
       { id: "eli5", h: "In plain terms", html: `
         <p><b>Escalation is a checklist, not a feeling.</b> Four things put a case in front of a human: the customer asked for one, the rulebook does not cover this, the rulebook says no and they want an exception, or you are stuck and repeating yourself. Nothing else. Not "this is hard." Not "they're shouting." Not "I'm not sure." Those are moods; the four are facts you can point at.</p>
         <p><b>The frustration rule.</b> When someone is angry and you can actually fix their problem, do not treat the anger as a transfer request. Say you get it, say what you can do right now, and let them choose. Say it <b>once</b>. If they ask again for a person, you are done negotiating — transfer. The mistake in both directions: bouncing every upset customer to a queue (they wanted the fix, not the queue), or talking a customer out of the human they asked for twice.</p>
@@ -2471,7 +2415,7 @@ action is ready; would you like me to complete it or connect you to a specialist
           <li><b>Delegation (preventive).</b> The official pattern is named "isolate high-volume operations": running tests, fetching documentation, or processing log files consumes significant context, so you delegate them and <b>the verbose output stays in the subagent's context while only the relevant summary returns</b>. For exploration this is the whole game — "find all test files", "trace the refund flow's dependencies" — the subagent eats hundreds of file reads and hands back a paragraph.</li>
           <li><b>The main agent's job during that is coordination</b>, not reading. It holds the high-level model of the system and decides what to ask next; it does not accumulate the raw material.</li>
           <li><b>The counter-pressure is real.</b> The same documentation page carries a warning: subagent results return to the main conversation, and running many subagents that each return detailed results can itself consume significant context. Delegation moves the cost; it does not delete it. Specify the return shape.</li>
-          <li><b>/compact (corrective).</b> When context has already filled with verbose discovery output, <code>/compact</code> summarizes the conversation. Give it direction — <code>/compact Focus on code samples and API usage</code> tells Claude what to preserve during summarization, and standing preferences can live under a "Compact instructions" heading in CLAUDE.md. In a fresh session <code>/compact</code> prints "Not enough messages to compact."</li>
+          <li><b>/compact (corrective).</b> When context has already filled with verbose discovery output, <code>/compact</code> summarizes the conversation — directed, if you say what to keep (<a class="pill" href="#/note/context-reset">Context Resets</a> covers the four resets and what survives each). Two details that only matter here: standing preferences can live under a <b>"Compact instructions"</b> heading in CLAUDE.md, and in a fresh session <code>/compact</code> prints "Not enough messages to compact."</li>
           <li>Auto-compaction fires on its own near the context limit, and <b>subagents compact too</b>, using the same logic as the main conversation. Main-conversation compaction does <b>not</b> touch subagent transcripts — those live in separate files.</li>
           <li><b>Order of operations:</b> delegate first, compact second. If you compact your way through an exploration that should have been delegated, you are repeatedly summarizing output that never needed to be in your context.</li>
         </ul>
@@ -2724,7 +2668,7 @@ action is ready; would you like me to complete it or connect you to a specialist
     ],
   },
   {
-    id: "context-reset", title: "Context Resets — /clear, /compact, /rewind, and What Survives", topic: "cc", domain: 5, tasks: [], concept: "sessionstate", icon: "⟲",
+    id: "context-reset", title: "Context Resets — /clear, /compact, /rewind, and What Survives", topic: "cc", domain: 5, tasks: ["5.1"], concept: "sessionstate", icon: "⟲",
     summary: "Four different resets, four different things kept. Verified against the official Claude Code commands, context-window and checkpointing documentation (20 Aug 2026). The practice exams get this one wrong more than once.",
     source: ["Claude Code Docs — Commands, \"All commands\"", "https://code.claude.com/docs/en/commands#all-commands"],
     sections: [
@@ -2768,7 +2712,7 @@ action is ready; would you like me to complete it or connect you to a specialist
     ],
   },
   {
-    id: "hook-events", title: "Hook Events — Which Moment Each One Catches", topic: "cc", domain: 3, tasks: [], concept: "determinism", icon: "⎔",
+    id: "hook-events", title: "Hook Events — Which Moment Each One Catches", topic: "cc", domain: 1, tasks: ["1.5"], concept: "determinism", icon: "⎔",
     summary: "A hook is only as good as the moment it fires at. The event timeline, which events can block, and the three the exam confuses. Verified against the official Claude Code hooks reference (20 Aug 2026).",
     source: ["Claude Code Docs — Hooks reference", "https://code.claude.com/docs/en/hooks"],
     sections: [
@@ -2780,9 +2724,9 @@ action is ready; would you like me to complete it or connect you to a specialist
           <li><b><code>PermissionRequest</code></b> / <b><code>PermissionDenied</code></b> — around the permission decision itself.</li>
           <li><b><code>PostToolUse</code></b> — "immediately after a tool completes <b>successfully</b>"; <b><code>PostToolUseFailure</code></b> is the failing twin, and <b><code>PostToolBatch</code></b> fires once after a whole batch of parallel calls resolves.</li>
           <li><b><code>Stop</code></b> — "when the main Claude Code agent has finished responding". This is the event that sees the <b>model's</b> finished answer. It does not run on user interrupt; API errors fire <code>StopFailure</code>.</li>
-          <li><b><code>SubagentStart</code></b> / <b><code>SubagentStop</code></b> — same bracket around a delegated run, matched on agent type.</li>
-          <li><b><code>PreCompact</code></b> / <b><code>PostCompact</code></b> (matcher <code>manual</code> | <code>auto</code>), <b><code>SessionEnd</code></b>, and file/environment events: <b><code>FileChanged</code></b>, <b><code>CwdChanged</code></b>, <b><code>DirectoryAdded</code></b>, <b><code>ConfigChange</code></b>, <b><code>InstructionsLoaded</code></b>.</li>
+          <li><b><code>SessionEnd</code></b> — the closing bracket of <code>SessionStart</code>.</li>
         </ul>
+        <p>Those eight are the per-turn spine, and they are the ones an item's four options are drawn from. Everything that hangs off a <i>different</i> rhythm — the delegation bracket, compaction, permission, environment, model-switch and MCP events — is catalogued once, grouped by what it intercepts, in <a class="pill" href="#/note/hook-orchestration">Orchestration Hooks</a>. Two names worth carrying here anyway, because they are the usual wrong answers: a delegated run brackets with <code>SubagentStart</code>/<code>SubagentStop</code>, not <code>PostToolUse</code>, and a compaction brackets with <code>PreCompact</code>/<code>PostCompact</code>.</p>
         <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#hook-events" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Hook events" (relevant section)</a></p>` },
       { id: "choose", h: "Choosing the event: what are you actually intercepting?", html: `
         <ul>
@@ -2948,8 +2892,8 @@ action is ready; would you like me to complete it or connect you to a specialist
     ],
   },
   {
-    id: "cost-levers", title: "Cost Levers — Volume, Model, Cache, Batch", topic: "ctx", domain: 5, tasks: [], concept: "batching", icon: "◧",
-    summary: "Four levers, four different problems. Pick by what the scenario actually describes — deadline, repetition, variance, or sheer input size. Prices verified against the official Anthropic pricing tables (20 Aug 2026).",
+    id: "cost-levers", title: "Cost Levers — Volume, Model, Cache, Batch", topic: "ctx", domain: 5, tasks: [], crosscut: true, concept: "caching", icon: "◧",
+    summary: "Four levers, four different problems. Pick by what the scenario actually describes — deadline, repetition, variance, or sheer input size. Includes the full caching playbook: what to cache, where the breakpoint goes, and the six scenarios the documentation names. Prices verified against the official Anthropic pricing tables (20 Aug 2026); caching rules against the prompt-caching documentation (1 Sep 2026).",
     source: ["Anthropic Docs — Batch processing, \"Pricing\"", "https://platform.claude.com/en/docs/build-with-claude/batch-processing#pricing"],
     sections: [
       { id: "levers", h: "The four levers and what each is worth", html: `
@@ -2960,6 +2904,26 @@ action is ready; would you like me to complete it or connect you to a specialist
           <li><b>Batch — 50% off, paid for in latency.</b> "All usage is charged at 50% of the standard API prices", asynchronous, results "when all messages have completed or after 24 hours, whichever comes first", and batches expire if they do not finish inside 24 hours.</li>
         </ul>
         <p class="srcline"><a href="https://platform.claude.com/en/docs/build-with-claude/prompt-caching#pricing" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Anthropic Docs, prompt caching pricing multipliers (relevant section)</a></p>` },
+      { id: "cache", h: "The cache lever in detail — what to cache, and where the breakpoint goes", html: `
+        <p>Caching is the lever with the best ratio and the narrowest precondition, so it gets its own rules. Everything here is the official best-practice list.</p>
+        <ul>
+          <li>Start with <b>automatic caching</b> for multi-turn conversations — it manages breakpoints for you. Reach for <b>explicit block-level breakpoints</b> only when you need to cache sections that change at different rates.</li>
+          <li>Cache content that is <b>stable and reused</b>: system instructions, background knowledge, large context, frequently used <b>tool definitions</b>.</li>
+          <li>Place cached content at the <b>beginning</b> of the prompt, and use breakpoints to separate distinct cacheable prefix sections.</li>
+          <li><b>The breakpoint rule the exam tests:</b> put it on the <b>last block that stays identical across requests</b>. With a static prefix plus a variable suffix (a timestamp, per-request context, the incoming message), the breakpoint belongs at the <b>end of the prefix</b> — never inside the changing block.</li>
+          <li>Analyze <b>cache hit rates</b> regularly and adjust. A prefix you believed was stable and is not shows up here first, as a write cost you keep paying.</li>
+        </ul>
+        <p><b>The six scenarios the documentation names</b>, because the exam borrows its stems from them:</p>
+        <ul>
+          <li><b>Conversational agents</b> — long conversations, especially with long instructions or uploaded documents.</li>
+          <li><b>Coding assistants</b> — keep a relevant section or summary of the codebase in the prompt for autocomplete and Q&amp;A.</li>
+          <li><b>Large document processing</b> — embed long-form material, images included, without increasing response latency.</li>
+          <li><b>Detailed instruction sets</b> — the leverage case: developers usually include a couple of examples, and with caching you can carry <b>20+ diverse, high-quality examples</b> for better performance.</li>
+          <li><b>Agentic tool use</b> — many tool calls and iterative code changes, where each step would otherwise re-send everything.</li>
+          <li><b>Talking to long-form content</b> — books, papers, documentation, transcripts embedded once and questioned repeatedly.</li>
+        </ul>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching#best-practices-for-effective-caching" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Anthropic Docs, Prompt caching, "Best practices for effective caching" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching#optimizing-for-different-use-cases" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Anthropic Docs, Prompt caching, "Optimizing for different use cases" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
       { id: "stack", h: "They stack — which is why the exam asks which one the scenario needs", html: `
         <ul>
           <li>A real high-volume pipeline uses several at once: triage by complexity, route to the cheapest adequate model, cache the shared instruction prefix, submit the non-urgent lanes as batches. Nothing here is exclusive.</li>
@@ -2970,7 +2934,7 @@ action is ready; would you like me to complete it or connect you to a specialist
         <ul>
           <li><b>Batch, when anything is blocking.</b> A PR gate, a chat reply, an interactive agent: 24-hour worst-case latency disqualifies it regardless of the discount (<a class="pill" href="#/q/e6q48">E6-Q48</a>). Batch is for "can run overnight".</li>
           <li><b>Batch, when the workload is uniform-but-varied.</b> A flat 50% does not respond to variance in document size; routing does (<a class="pill" href="#/q/e6q60">E6-Q60</a>).</li>
-          <li><b>Cache, when the prefix is not stable.</b> A per-user profile in front of the system prompt, a timestamp early in the prompt, a changed <code>tool_choice</code> — each invalidates the cached prefix and you pay the 1.25× write again for nothing. Static content first, variable content last: see <a class="pill" href="#/note/prompt-caching">prompt caching rules</a>.</li>
+          <li><b>Cache, when the prefix is not stable.</b> A per-user profile in front of the system prompt, a timestamp early in the prompt, a changed <code>tool_choice</code> — each invalidates the cached prefix and you pay the 1.25× write again for nothing. Static content first, variable content last — the breakpoint rule is in <a class="pill" href="#/note/cost-levers" onclick="return jumpTo('cache')">the cache section above</a>.</li>
           <li><b>Routing, when the cheap model cannot do the job.</b> A triage step that mis-routes buys a re-run at full price plus the triage call. Route on a signal you can measure cheaply — page count, file size, category — not on a guess about difficulty.</li>
           <li><b>Volume-cutting, when the removed context was load-bearing.</b> A diff-only security review cannot see a caller three files away; the fix is a few lines of surrounding context or a targeted second pass, not shipping the whole tree.</li>
         </ul>` },
@@ -3279,7 +3243,7 @@ claude -p "Now check the migration files" --resume "$session_id"</code></pre>
         <p><b>4.6's per-finding confidence is a shipped Anthropic product behaviour, not a thought experiment.</b> Code Review exposes it as an effort dial, and the documented direction is the one people get backwards: "at <code>low</code> and <code>medium</code>, the review reports only the findings it's <b>most confident in</b>, so you see fewer false positives; <code>high</code> through <code>max</code> broaden coverage and <b>may include findings the review is less sure about</b>." Per-finding certainty is the thing being thresholded, and raising coverage costs precision. That is 4.6's routing bullet with a knob attached.</p>
         <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#tune-effort-and-arguments" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "Tune effort and arguments" (relevant section) — effort trades coverage against per-finding confidence <span aria-hidden="true">↗</span></a></p>
         <p>The same test, sharpened by the mistake record on triage: <b>when a deterministic signal exists, it beats a self-rated one at any granularity.</b> Routing findings by source directory — security-critical paths to a human — needs no calibration at all, because a file path is not an estimate. Reach for confidence when the property you are routing on is only knowable semantically.</p>
-        <p>And the limit at the far end: confidence measures <i>how sure the model is about what the source says</i>. It does not measure whether the source is coherent. A self-contradicting invoice — line items summing to $1,240 against a printed total of $1,280 — can be read at 0.97 confidence, correctly, because both numbers are crisply printed. That is why 5.5 lists <b>two independent routing triggers</b>, low calibrated confidence and ambiguous/contradictory source content. Raising the threshold never catches the second one.</p>
+        <p>And the limit at the far end, which no granularity fixes: confidence measures <i>how sure the model is about what the source says</i>, never whether the source is coherent. That is why 5.5 lists <b>two independent routing triggers</b> rather than one threshold — worked through, with the self-contradicting invoice that survives a 0.97 score, in <a class="pill" href="#/note/confidence-review">Confidence Calibration and Human Review</a>.</p>
         <p class="srcline none">Exam wording for all three rows: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (the official Anthropic Claude Certification Program exam guide) p. 27 (Task Statement 4.6, Skills bullet 3), pp. 22-23 (5.5, Knowledge bullet 3 and Skills bullets 3-4), p. 23 (5.2, Knowledge bullet 3). The <i>reconciliation</i> between them is this note's argument, not a documented claim — the documentation linked above shows the 4.6 behaviour shipping, but nowhere states why 5.2 excludes confidence while 4.6 and 5.5 accept it. Developed further in <a class="pill" href="#/note/extraction-validation">Extraction Feedback Loops</a> and <a class="pill" href="#/note/escalation-ambiguity">Escalation and Ambiguity</a>.</p>` },
       { id: "eli5", h: "In plain terms", html: `
         <p>Think of a graded exam paper instead of a document.</p>
@@ -5188,6 +5152,7 @@ function router(){
   closeMobileNav();
   if (booted) mainEl.focus({ preventScroll: true });
   booted = true;
+  flushJump();
 }
 window.addEventListener("hashchange", router);
 
@@ -5389,7 +5354,7 @@ function examCard(ex){
 
 /* Not kartı (notlar listesi satırı). */
 function noteCard(n){
-  const tasks = (n.tasks || []).length ? ` ${n.tasks.join(" · ")}` : "";
+  const tasks = (n.tasks || []).length ? ` ${n.tasks.join(" · ")}` : (n.crosscut ? " · cross-cutting" : "");
   return `<a class="row" href="#/note/${n.id}">
     <div class="rtop">
       <span class="tcode" title="${DOMAINS[n.domain].name}">D${n.domain}</span>
@@ -5548,7 +5513,7 @@ const TOPIC_REMEMBER = {
     </div>
     <p class="small quiet" style="margin:16px 0 12px">Breakpoint kendinden öncekini cache'ler. Uzun iş akışında kalıcı bilgiyi
       (style guide) her isteğe ekle.</p>
-    <a class="pill" href="#/note/prompt-caching">Cache püf noktaları notunu aç →</a></div>`,
+    <a class="pill" href="#/note/cost-levers">Maliyet kaldıraçları notunu aç →</a></div>`,
 };
 
 function renderTopic(k){
@@ -5825,8 +5790,11 @@ function renderNote(id){
 
   setCrumbs([{ t: "Notes", h: "#/notes" }, { t: n.title }]);
 
+  /* Blueprint bağı: ya task statement listesi, ya da bilerek bağsız bir eksen notu.
+     Boş `tasks` tek başına ikisini ayırt etmiyordu; `crosscut` bunu görünür yapar. */
   const taskLine = (n.tasks || []).length
-    ? ` · Task Statement${n.tasks.length > 1 ? "s" : ""} ${n.tasks.join(", ")}` : "";
+    ? ` · Task Statement${n.tasks.length > 1 ? "s" : ""} ${n.tasks.join(", ")}`
+    : (n.crosscut ? " · No blueprint task — cross-cutting note" : "");
 
   view.innerHTML = `
     <div class="with-toc">
@@ -5948,11 +5916,27 @@ function renderUsage(){
 function setUsageFilter(k){ uFilter = k; renderUsage(); }
 
 /* Sayfa-içi atlama. Düz `href="#id"` burada işe yaramaz: hash router onu rota
-   olarak okur ve panele düşer. Bağlantı mevcut rotada kalır, kaydırmayı JS yapar. */
+   olarak okur ve panele düşer. Bağlantı mevcut rotada kalır, kaydırmayı JS yapar.
+
+   Hedef bu sayfada yoksa (notlardan bir kullanım kartına atlamak gibi) engelleme:
+   href'in rotaya gitmesine izin ver, hedefi `pendingJump`a yaz, hedef ekran
+   çizildikten sonra oraya kaydır. Aksi hâlde bağlantı sessizce hiçbir şey yapmaz. */
+let pendingJump = null;
 function jumpTo(id){
   const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  return false;
+  if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); return false; }
+  pendingJump = id;
+  return true;
+}
+function flushJump(){
+  if (!pendingJump) return;
+  const id = pendingJump; pendingJump = null;
+  /* Rota değiştikten sonraki iniş: anlık kaydır. Smooth burada yanlış — kullanıcı
+     zaten yeni sayfaya geçti, 3000px'lik animasyonu izlemesi gerekmiyor.
+     requestAnimationFrame de kullanılmıyor: sekme gizliyken rAF hiç tetiklenmez ve
+     kaydırma sessizce düşerdi. Rota işleyicisi DOM'u zaten senkron yazdı. */
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ block: "start" });
 }
 
 function tocJump(title, hash, items){

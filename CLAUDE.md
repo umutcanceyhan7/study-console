@@ -58,6 +58,32 @@ Static single-page study console for CCA-F / CCAR-F certification prep, deployed
   vocabulary, shell-style `$VAR`) over invented strawmen. `tasks` may span domains, but at least one
   entry must match the card's own `domain`.
 
+### One claim, one owner
+
+A note and a card are not two places to say the same thing. **A note decides; a card spells.** When
+a fact appears in both, the note keeps only the sentence that changes an answer and links to the
+card with `href="#/usage" onclick="return jumpTo('<card-id>')"`; the card keeps the table, the
+values, and the wrong lookalikes. The same rule holds between two notes: the deeper treatment owns
+the claim and the other one links to it in a sentence.
+
+This is a maintenance rule, not a style preference. A duplicated claim gets updated in one copy when
+the docs move, and the other copy goes quietly stale — which is the failure mode the source-of-truth
+rule above exists to prevent.
+
+`jumpTo(id)` scrolls when the target is on the current page and otherwise lets the `href` navigate,
+stashing the id in `pendingJump` for `router()` to flush after render. Do not reintroduce
+`requestAnimationFrame` there: rAF never fires while the tab is hidden and the jump silently drops.
+
+### Notes without a blueprint task
+
+`tasks: []` alone cannot distinguish "nobody wrote the task down" from "the blueprint has no task for
+this". Notes in the second group carry `crosscut: true`, which renders as *No blueprint task —
+cross-cutting note* on the detail page and `· cross-cutting` on the list. Only exam-technique and
+cross-domain notes qualify (`distractor-axes`, `simplest-first`, `cost-levers`); anything with a real
+home in the blueprint gets the task instead. Note `domain` must match every `tasks` prefix —
+`validate.mjs` enforces it — so a note whose subject lives in another domain gets its `domain`
+corrected rather than a mismatched task bolted on.
+
 ## Question bank (`#/bank`)
 
 529 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
