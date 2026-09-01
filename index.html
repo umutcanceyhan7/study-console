@@ -2800,11 +2800,151 @@ action is ready; would you like me to complete it or connect you to a specialist
           <li>"Auto-fix lint on every save" → <code>PostToolUse</code> on the editing tools (or <code>FileChanged</code> if the write may come from a script). There is no <code>--auto-lint</code> flag and no cron answer.</li>
           <li>"Escalate when the user gets abusive" → the reliable shape is <b>two triggers</b>: an <code>escalate_to_human</code> tool the model can call, plus a programmatic check that fires even when the model does not. <b>Course wording to distrust:</b> one BONUS Set 2 key words this as "a Post ToolUse hook that analyzes the agent's output sentiment" — but <code>PostToolUse</code> fires after a <b>tool</b> and matches tool names. Judging the model's own text is <code>Stop</code>; judging the user's text is <code>UserPromptSubmit</code>. The architecture is right, the event name is not.</li>
           <li>Hooks are the deterministic half of the recurring trade — see <a class="pill" href="#/note/hook-vs-prompt">deterministic vs probabilistic</a>. For matcher syntax and the config shape see <a class="pill" href="#/usage" onclick="return jumpTo('hook-matcher')">the hook matcher card</a>.</li>
+          <li>Coordination items live outside this timeline: aggregating parallel subagents, gating task completion, and the five handler types are in <a class="pill" href="#/note/hook-orchestration">Orchestration Hooks</a>.</li>
         </ul>` },
     ],
     related: [
       { id: "e6q35", why: "PreToolUse versus a sandbox: perimeter or per-argument rule." },
       { id: "e5q68", why: "permissionDecision 'ask' is the approval path; 'deny' just cancels." },
+    ],
+  },
+  {
+    id: "hook-orchestration", title: "Orchestration Hooks — The Subagent, Task, and Stop Family", topic: "agent", domain: 1, tasks: ["1.4", "1.5"], concept: "delegation", icon: "◈",
+    summary: "PreToolUse and PostToolUse are the two hooks everyone learns; coordination questions are decided by the ones nobody lists. The full event catalog, the delegation family in detail, what each event can and cannot block, and the five handler types. Verified against the official Claude Code hooks reference and the Agent SDK hooks page (1 Sep 2026).",
+    source: ["Claude Code Docs — Hooks reference, \"Hook lifecycle\"", "https://code.claude.com/docs/en/hooks#hook-lifecycle"],
+    related: [
+      { id: "e13q8", why: "The other delegation-depth question: the course keys five levels, the docs say three layers below the main conversation and configurable. Same family, same habit of guessing a number." },
+      { id: "e12q9", why: "A hook-output question where the keyed answer is right for a reason the key does not state. Read hook fields as a contract, not as prose." },
+    ],
+    sections: [
+      { id: "catalog", h: "The full catalog — every event, grouped by what it brackets", html: `
+        <p>The documentation groups events by <b>cadence</b>: once per session (<code>SessionStart</code>, <code>SessionEnd</code>), once per turn (<code>UserPromptSubmit</code>, <code>Stop</code>, <code>StopFailure</code>), and once per tool call inside the agentic loop (<code>PreToolUse</code>, <code>PostToolUse</code>). Everything else hangs off one of those three rhythms. Grouped by <b>what you are intercepting</b>, the list is:</p>
+        <table>
+          <thead><tr><th>Group</th><th>Events</th></tr></thead>
+          <tbody>
+            <tr><td><b>Session</b></td><td><code>SessionStart</code> · <code>Setup</code> · <code>SessionEnd</code></td></tr>
+            <tr><td><b>Input</b></td><td><code>UserPromptSubmit</code> · <code>UserPromptExpansion</code></td></tr>
+            <tr><td><b>Tool call</b></td><td><code>PreToolUse</code> · <code>PostToolUse</code> · <code>PostToolUseFailure</code> · <code>PostToolBatch</code></td></tr>
+            <tr><td><b>Permission</b></td><td><code>PermissionRequest</code> · <code>PermissionDenied</code></td></tr>
+            <tr><td><b>Delegation</b></td><td><code>SubagentStart</code> · <code>SubagentStop</code> · <code>TaskCreated</code> · <code>TaskCompleted</code> · <code>TeammateIdle</code></td></tr>
+            <tr><td><b>Turn end</b></td><td><code>Stop</code> · <code>StopFailure</code></td></tr>
+            <tr><td><b>Output surface</b></td><td><code>MessageDisplay</code> · <code>Notification</code></td></tr>
+            <tr><td><b>Context</b></td><td><code>PreCompact</code> · <code>PostCompact</code> · <code>InstructionsLoaded</code></td></tr>
+            <tr><td><b>Environment</b></td><td><code>ConfigChange</code> · <code>CwdChanged</code> · <code>DirectoryAdded</code> · <code>FileChanged</code> · <code>WorktreeCreate</code> · <code>WorktreeRemove</code></td></tr>
+            <tr><td><b>Model</b></td><td><code>PreModelSwitch</code> · <code>PostModelSwitch</code></td></tr>
+            <tr><td><b>MCP</b></td><td><code>Elicitation</code> · <code>ElicitationResult</code></td></tr>
+          </tbody>
+        </table>
+        <p>The exam does not ask you to recite this. It asks you to pick the one event whose <b>moment</b> matches the requirement — so what matters is knowing that a delegation group <b>exists</b> and is not spelled <code>PostToolUse</code>. For the per-turn timeline and the input/output split, see <a class="pill" href="#/note/hook-events">Hook Events — Which Moment Each One Catches</a>.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#hook-events" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Hook events" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "delegation", h: "The delegation family — one bracket per unit of delegated work", html: `
+        <p>Every delegation event is one half of a bracket around work that a <b>different</b> executor performs. Read them in pairs:</p>
+        <table>
+          <thead><tr><th>Event</th><th>Fires when</th><th>Key input</th><th>Can it block?</th></tr></thead>
+          <tbody>
+            <tr><td><code>SubagentStart</code></td><td>A subagent is spawned via the Agent tool</td><td><code>agent_id</code>, <code>agent_type</code></td><td><b>No.</b> It cannot prevent creation — but it can return <code>additionalContext</code>, injected into the subagent before its first prompt</td></tr>
+            <tr><td><code>SubagentStop</code></td><td>A subagent has finished responding</td><td><code>agent_id</code>, <code>agent_type</code>, <code>agent_transcript_path</code>, <code>last_assistant_message</code></td><td><b>Yes</b> — see the next section for <i>who</i> the block talks to</td></tr>
+            <tr><td><code>TaskCreated</code></td><td>A task is created via the <code>TaskCreate</code> tool</td><td><code>task_id</code>, <code>task_subject</code>, <code>task_description</code></td><td><b>Yes.</b> The task is deleted and your message is returned to Claude as the tool's error</td></tr>
+            <tr><td><code>TaskCompleted</code></td><td>A task is marked completed, by <code>TaskUpdate</code> or by a teammate finishing its turn</td><td>same as above</td><td><b>Yes.</b> The completion-criteria gate: run the tests, exit 2, the task stays open</td></tr>
+            <tr><td><code>TeammateIdle</code></td><td>An agent-team teammate is about to go idle</td><td><code>teammate_name</code></td><td><b>Yes.</b> Exit 2 sends stderr as feedback and the teammate keeps working</td></tr>
+            <tr><td><code>PostToolBatch</code></td><td>Every call in a parallel batch has resolved, before the next model call</td><td><code>tool_calls</code> array, each with <code>tool_response</code></td><td><b>Yes</b> — it stops the agentic loop before the next model call</td></tr>
+            <tr><td><code>StopFailure</code></td><td>The turn ends on an API error instead of a normal stop</td><td><code>error</code> (<code>rate_limit</code>, <code>overloaded</code>, …)</td><td><b>No.</b> Logging and alerting only; output and exit code are ignored</td></tr>
+          </tbody>
+        </table>
+        <p>Two of these are easy to confuse with the subagent pair and are not the same thing:</p>
+        <ul>
+          <li><b><code>PostToolBatch</code> is about parallel <i>tool calls</i>, not parallel <i>subagents</i>.</b> <code>PostToolUse</code> fires once per tool and therefore fires concurrently when Claude batches calls; <code>PostToolBatch</code> fires exactly once with the whole batch, which is why it is the right place for context that depends on the <b>set</b> of tools that ran.</li>
+          <li><b><code>TaskCompleted</code> is about the task list, not about an agent finishing.</b> A subagent can end without any task being closed, and a task can close without a subagent existing.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#subagentstart" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "SubagentStart" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#posttoolbatch" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "PostToolBatch" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "aggregate", h: "Aggregating parallel subagent results — and the direction trap", html: `
+        <p>The canonical Task Statement 1.4 scenario: a coordinator spawns two subagents in parallel, and before synthesising it needs to know both actually finished and what each one found. The answer is <b><code>SubagentStop</code></b>, and the Agent SDK documentation states the use case in those exact terms — its event table lists <code>SubagentStop</code> against "Aggregate results from parallel tasks".</p>
+        <p>What makes the aggregation possible is one field: <b><code>last_assistant_message</code></b> carries the text of the subagent's final response, "so hooks can access it without parsing the transcript file". <code>agent_transcript_path</code> points at the subagent's own transcript in a nested folder if you need more than the last message.</p>
+        <p><b>The nuance the wording hides.</b> A <code>SubagentStop</code> hook runs in the <b>subagent's</b> frame, not the coordinator's. Returning <code>decision: "block"</code> with a <code>reason</code> keeps that subagent running and delivers the reason to <b>it</b> as its next instruction — it does not speak to the parent. The documentation says so explicitly: to inject context into the parent session after a subagent returns, use a <code>PostToolUse</code> hook on the <code>Agent</code> tool instead. So:</p>
+        <ul>
+          <li><b>Observe / log / write to a shared file as each subagent lands</b> → <code>SubagentStop</code>. This is the aggregation the exam means.</li>
+          <li><b>Push text into the coordinator's context after a delegated run</b> → <code>PostToolUse</code> matched on <code>Agent</code>.</li>
+          <li><b>Send the subagent back for another pass</b> → <code>SubagentStop</code> with <code>decision: "block"</code>, or exit 2 with stderr, which routes identically.</li>
+        </ul>
+        <p>The three distractors in that item are each wrong on a different axis, which is the useful part to memorise:</p>
+        <table>
+          <thead><tr><th>Distractor</th><th>Failure axis</th></tr></thead>
+          <tbody>
+            <tr><td><code>UserPromptSubmit</code></td><td><b>Wrong moment.</b> It fires on the user's prompt, before any delegation happened — nothing to aggregate yet</td></tr>
+            <tr><td><code>PreToolUse</code></td><td><b>Wrong direction in time.</b> It runs before the call executes and has no result to inspect</td></tr>
+            <tr><td><code>Notification</code></td><td><b>Wrong channel.</b> It carries status messages (<code>permission_prompt</code>, <code>idle_prompt</code>, …), cannot block or modify anything, and exists for side effects like forwarding to an external service</td></tr>
+          </tbody>
+        </table>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#subagentstop" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "SubagentStop" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/agent-sdk/hooks#available-hooks" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Agent SDK Docs, "Available hooks" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "blocking", h: "Enforcement gates versus observers", html: `
+        <p>Task Statement 1.4 is about <b>programmatic enforcement</b>, so the question behind most items is: can this event actually stop something? Exit code 2 is the universal "stop, do not do this" signal, and the documentation tables its effect per event. Split the catalog in two and the enforcement questions answer themselves:</p>
+        <table>
+          <thead><tr><th>Can block (exit 2 has teeth)</th><th>Observe only (exit code ignored or stderr-to-user)</th></tr></thead>
+          <tbody>
+            <tr><td><code>PreToolUse</code> (blocks the call)</td><td><code>PostToolUse</code>, <code>PostToolUseFailure</code> (the tool already ran)</td></tr>
+            <tr><td><code>UserPromptSubmit</code> (blocks and <b>erases</b> the prompt), <code>UserPromptExpansion</code></td><td><code>SubagentStart</code>, <code>SessionStart</code>, <code>SessionEnd</code>, <code>Setup</code></td></tr>
+            <tr><td><code>Stop</code>, <code>SubagentStop</code>, <code>TeammateIdle</code></td><td><code>StopFailure</code>, <code>Notification</code>, <code>PermissionDenied</code></td></tr>
+            <tr><td><code>TaskCreated</code>, <code>TaskCompleted</code></td><td><code>PostCompact</code>, <code>PostModelSwitch</code>, <code>InstructionsLoaded</code>, <code>MessageDisplay</code></td></tr>
+            <tr><td><code>PostToolBatch</code>, <code>PreCompact</code>, <code>PreModelSwitch</code>, <code>ConfigChange</code>, <code>WorktreeCreate</code>, <code>Elicitation</code>, <code>ElicitationResult</code></td><td><code>CwdChanged</code>, <code>DirectoryAdded</code>, <code>FileChanged</code>, <code>WorktreeRemove</code></td></tr>
+          </tbody>
+        </table>
+        <p>Two entries look like exceptions and are worth learning as such:</p>
+        <ul>
+          <li><b><code>PermissionRequest</code> does not honour exit code 2 at all.</b> The permission flow proceeds unchanged; you deny through its <code>decision</code> object. An answer that "blocks with exit 2 in a PermissionRequest hook" is wrong however sensible it reads.</li>
+          <li><b>Blocking <code>Stop</code>/<code>SubagentStop</code> is not free.</b> <code>stop_hook_active</code> tells you the continuation was hook-driven, and Claude Code overrides the hook and ends the turn after <b>8 consecutive blocks</b>. A "keep retrying until it passes" gate is bounded, not infinite.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#exit-code-2-behavior-per-event" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Exit code 2 behavior per event" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "handlers", h: "A hook is not necessarily a shell script — five handler types", html: `
+        <p>The <code>type</code> field on a handler is a second axis the exam can probe, independent of the event:</p>
+        <table>
+          <thead><tr><th>Type</th><th>What runs</th><th>Default timeout</th></tr></thead>
+          <tbody>
+            <tr><td><code>command</code></td><td>A shell command; JSON input on stdin, results via exit code and stdout</td><td>600 s</td></tr>
+            <tr><td><code>http</code></td><td>An HTTP POST of the event JSON to a URL; the response body uses the same JSON output schema</td><td>600 s</td></tr>
+            <tr><td><code>mcp_tool</code></td><td>A tool call on an <b>already-connected</b> MCP server; its text output is read like command stdout</td><td>600 s</td></tr>
+            <tr><td><code>prompt</code></td><td>A single-turn evaluation by a Claude model that returns its decision as JSON</td><td>30 s</td></tr>
+            <tr><td><code>agent</code></td><td>A subagent that can use Read, Grep and Glob to verify a condition before deciding. <b>Experimental</b></td><td>60 s</td></tr>
+          </tbody>
+        </table>
+        <ul>
+          <li><b>All matching hooks run in parallel</b>, and the same handler defined in more than one settings file runs once.</li>
+          <li><b>An <code>http</code> hook cannot block with a status code.</b> Non-2xx is a non-blocking error; to deny, return 2xx with a JSON decision body. This is the HTTP analogue of the exit-2-versus-JSON split.</li>
+          <li><b>A <code>prompt</code> or <code>agent</code> hook is still probabilistic.</b> It is deterministic that it <i>runs</i>; the verdict it returns is a model judgement. When a scenario demands a guarantee, the deterministic answer is a <code>command</code> hook or a permission rule — see <a class="pill" href="#/note/hook-vs-prompt">deterministic enforcement vs probabilistic compliance</a>.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/hooks#hook-handler-fields" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Hook handler fields" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "parity", h: "Claude Code hooks versus Agent SDK hooks", html: `
+        <p>Task Statement 1.5 is worded as <i>Agent SDK</i> hooks, so the parity question is fair game. The event names are shared, but availability is not:</p>
+        <ul>
+          <li><b>The SDK exposes hooks as callback functions</b>, not shell commands. Same events, same JSON shapes, different plumbing.</li>
+          <li><b>The Python SDK carries a subset.</b> <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PostToolUseFailure</code>, <code>UserPromptSubmit</code>, <code>Stop</code>, <code>SubagentStart</code>, <code>SubagentStop</code>, <code>PreCompact</code>, <code>PermissionRequest</code> and <code>Notification</code> are in both SDKs. <code>SessionStart</code>, <code>SessionEnd</code>, <code>PostToolBatch</code>, <code>TaskCreated</code>, <code>TaskCompleted</code>, <code>TeammateIdle</code>, <code>StopFailure</code> and the rest are TypeScript-only. <b>The subagent pair is in both</b> — which is why a coordinator-aggregation question has a valid answer in either SDK.</li>
+          <li><b>Matchers are not uniform.</b> Tool events match on tool name; <code>SubagentStart</code>/<code>SubagentStop</code> match on <b>agent type</b> (the frontmatter <code>name</code>, or the plugin-scoped <code>plugin:agent</code> identifier); <code>Notification</code> matches on notification type; <code>Stop</code> ignores matchers entirely; <code>TaskCreated</code>, <code>TaskCompleted</code>, <code>TeammateIdle</code> and <code>PostToolBatch</code> support no matcher and fire every time.</li>
+          <li><b>Recursion is a real failure mode.</b> A <code>UserPromptSubmit</code> hook that spawns subagents can loop forever if those subagents trigger the same hook; the documented fix is to detect the subagent frame in the hook input, or scope the hook to the top-level session.</li>
+          <li><b>Timeouts fail differently per event.</b> A timed-out <code>PreToolUse</code> means the tool does not run; a timed-out <code>Stop</code>/<code>SubagentStop</code> just warns and the agent stops normally — a stop gate that hangs does not hold the agent.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/agent-sdk/hooks#available-hooks" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Agent SDK Docs, "Available hooks" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "gap", h: "Where the study guide stops short", html: `
+        <p>Worth knowing before you trust a single source: the curated guide names only four hooks — <code>PreToolUse</code>, <code>PostToolUse</code>, <code>UserPromptSubmit</code>, <code>SessionStart</code> — plus <code>InstructionsLoaded</code> as a debugging aid, and its cheat-sheet line repeats exactly those four. The blueprint PDF names only <code>PostToolUse</code> by example, under Task Statement 1.5. Neither mentions the delegation family at all, yet a practice item under Task Statement 1.4 turns on <code>SubagentStop</code>.</p>
+        <p><b>Take-away:</b> for Domain 1 orchestration items, the guide is a floor, not a ceiling. The hooks reference is the list to work from.</p>
+        <p class="srcline none">Sources: <code>exam-preparation-guide.md</code> §"Hooks and Permissions" (repo root, lines 1446-1453) and the cheat-sheet line 1949; <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> Task Statements 1.4 (p. 8) and 1.5 (p. 8-9). No documentation link applies — this is an observation about coverage, not a product claim.</p>` },
+      { id: "plan", h: "Study order and self-checks", html: `
+        <p>Foundations first, then the events that only matter once delegation is in play:</p>
+        <ol>
+          <li><b>Enforcement versus guidance</b> (Task Statement 1.4's first Knowledge bullet). Why a hook and not a prompt instruction, and what "non-zero failure rate" buys you. Start at <a class="pill" href="#/note/hook-vs-prompt">deterministic enforcement vs probabilistic compliance</a>.</li>
+          <li><b>The per-turn timeline</b> — input, tool, output. <a class="pill" href="#/note/hook-events">Hook Events</a>, then the matcher and config shape in <a class="pill" href="#/usage" onclick="return jumpTo('hook-matcher')">the hook matcher card</a>.</li>
+          <li><b>The blocking split</b> above. Every enforcement item reduces to "does this event have teeth".</li>
+          <li><b>The delegation family</b> — the two tables in this note. This is the layer the guide skips.</li>
+          <li><b>Handler types and SDK parity</b> — last, because they only decide an item when the event is already settled.</li>
+        </ol>
+        <p>Check yourself:</p>
+        <ul>
+          <li>A coordinator must not synthesise until both parallel subagents have returned, and it needs each one's findings. Which event, and which single input field makes the findings readable without opening a transcript?</li>
+          <li>You write a <code>SubagentStop</code> hook that returns <code>decision: "block"</code> with a reason. Who receives that reason — the subagent or the coordinator? What would you use instead to reach the other one?</li>
+          <li>A task may not be marked complete until the test suite passes. Which event, and what does exit code 2 do there that it does not do in <code>PostToolUse</code>?</li>
+          <li>Claude issued four <code>Read</code> calls in one batch and you want to inject one convention reminder afterwards — not four. Which event?</li>
+          <li>Your gate blocks <code>Stop</code> until a condition holds. What stops that from looping forever, and what field tells the hook it is already inside a hook-driven continuation?</li>
+        </ul>` },
     ],
   },
   {
@@ -2846,6 +2986,331 @@ action is ready; would you like me to complete it or connect you to a specialist
     related: [
       { id: "e6q48", why: "Price lever reached for when the problem was input volume." },
       { id: "e6q60", why: "The same substitution, where the scenario's clue was variance." },
+    ],
+  },
+  {
+    id: "ci-pipelines", title: "Claude Code in CI/CD — Non-Interactive Runs, Parseable Findings, Review Hygiene", topic: "cc", domain: 3, tasks: ["3.6"], concept: "ccsec", icon: "⌘",
+    summary: "The whole of Task Statement 3.6: why a CI job hangs without -p, what the pipe can and cannot carry, how to get machine-parseable findings out, which permission mode a pipeline should run under, the two different things \"session isolation\" means, how Code Review / the GitHub Action / raw claude -p differ, and the v1 configuration model. Every claim sourced to the official Claude Code documentation (checked 1 Sep 2026), with the exam's own wording from the official Anthropic exam guide PDF, p. 24.",
+    source: ["Claude Code Docs — Run Claude Code programmatically", "https://code.claude.com/docs/en/headless"],
+    related: [
+      { id: "e13q4", why: "The observed miss. Piped stdin has a <b>10MB ceiling</b>, and the fix is a file path, not a flag." },
+      { id: "e12q21", why: "The second observed miss. <code>claude-code-action@v1</code> did not rename its inputs — it stopped having its own vocabulary." },
+      { id: "e6q47", why: "\"Isolate the CI run\" answered at the wrong layer: <code>/clear</code> resets a conversation, not a machine." },
+      { id: "e6q48", why: "Cost in CI is an <b>input-volume</b> problem before it is a price problem. Send the diff." },
+      { id: "e6q41", why: "The corrupted item that invents a <code>--project</code> flag and then miscalls <code>-p</code> \"--project\". <code>-p</code> is <code>--print</code>." },
+    ],
+    sections: [
+      { id: "why-p", h: "Why the job hangs, and what -p actually changes", html: `
+        <p>The canonical 3.6 item is a pipeline that runs bare <code>claude "Analyze this PR"</code> and hangs forever. Claude Code started an <b>interactive</b> session and is waiting for a human at a TTY that does not exist. <code>-p</code> (long form <code>--print</code>) is the documented switch into non-interactive mode: process the prompt, print the result to stdout, exit.</p>
+        <pre><code>claude -p "Find and fix the bug in auth.py" --allowedTools "Read,Edit,Bash"</code></pre>
+        <ul>
+          <li><b>Exit status is the contract.</b> <code>0</code> on success, non-zero when the run fails, so a shell script can branch on it. An invalid flag is reported to stderr <i>before</i> the run; a failure inside the run (missing auth, for instance) is printed as the result on <b>stdout</b>. A CI gate that only greps stdout for the word "error" will miss the first class and misread the second — branch on the exit code.</li>
+          <li><b>SIGTERM exits with 143</b> and leaves the in-progress turn unfinished with no result recorded. Claude Code kills the process tree of any running Bash command, runs <code>SessionEnd</code> hooks, and exits. If your runner's job timeout fires, that is the shape of the failure you get.</li>
+          <li><b>Not every flag combines with <code>-p</code>.</b> <code>--bg</code> is rejected outright; <code>--cloud</code> with a task description is rejected; <code>--cloud</code> with a session ID queues a message into that cloud session and exits.</li>
+        </ul>
+        <p><b>The three distractors this item always ships with are non-existent features</b>, and the guide names them: a <code>CLAUDE_HEADLESS=true</code> environment variable, a <code>--batch</code> flag, and redirecting stdin from <code>/dev/null</code>. The first two do not exist. The third is a Unix workaround that does not address the syntax at all — and note that it is <i>almost</i> plausible, because a closed stdin does change behaviour: when Claude Code cannot read stdin it prints a warning to stderr and continues with the command-line prompt. It still starts an interactive session.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#basic-usage" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Run Claude Code programmatically, "Basic usage" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none">Exam wording: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> p. 24, Task Statement 3.6, Knowledge bullet 1 and Skills bullet 1; the worked item is Scenario 5, Question 10 (p. 38). <code>exam-preparation-guide.md</code> has <b>no</b> CI/CD section at all — searched for headless, non-interactive, <code>claude -p</code>, <code>--print</code>, automation mode and pre-commit, zero hits. 3.6 is the one task statement the curated guide does not reach, so unlike most notes in this file there is no fourth source to cross-check against; everything here rests on the documentation and the blueprint.</p>` },
+      { id: "stdin", h: "Getting input in — the pipe and its ceiling", html: `
+        <p>Non-interactive mode reads stdin, so Claude composes with the rest of the shell. The doc's own example is, character for character, the command in the missed question:</p>
+        <pre><code>cat build-error.txt | claude -p 'concisely explain the root cause of this build error' &gt; output.txt</code></pre>
+        <p>So plain text on stdin is the <b>default and documented</b> pattern. <code>--input-format stream-json</code> is not a precondition for piping; it belongs to the streaming input/output pairing.</p>
+        <p><b>The ceiling: piped stdin is capped at 10MB.</b> Past the cap Claude Code exits with a clear error and a non-zero status — it does not truncate, and it does not silently ignore the input. That distinction is the whole item: a stem that says the job <i>exits with an error</i> is describing a hard cap, not an ignored input.</p>
+        <p><b>The documented fix is not a flag.</b> Write the content to a file and reference the file path in the prompt. Claude then reads it with the <code>Read</code> tool, which has no pipe limit — and as a bonus reads only what it needs instead of pushing the whole log through the context window.</p>
+        <pre><code># fails above 10MB
+cat build-error.txt | claude -p 'explain the root cause' &gt; output.txt
+
+# no pipe limit: name the path and let Read fetch it
+claude -p 'explain the root cause of the build failure in ./build-error.txt' \\
+  --allowedTools "Read" &gt; output.txt</code></pre>
+        <p>One more piping nuance worth keeping, from the build-script example: piping the diff in means Claude <b>does not need Bash permission</b> to produce it. Choosing between <code>git diff main | claude -p …</code> and letting Claude run <code>git diff</code> itself is a permission decision, not just a plumbing one.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#pipe-data-through-claude" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Pipe data through Claude" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "output", h: "Getting findings out — --output-format and --json-schema", html: `
+        <p>The blueprint pairs these two flags in one Skills bullet: produce <b>machine-parseable structured findings for automated posting as inline PR comments</b>. A pipeline that has to regex a prose review is a pipeline that will post garbage the first time the prose changes shape.</p>
+        <table>
+          <thead><tr><th>Value</th><th>What you get</th><th>Use in CI when</th></tr></thead>
+          <tbody>
+            <tr><td><code>text</code> (default)</td><td>Plain text on stdout</td><td>A human reads the job log; nothing downstream parses it</td></tr>
+            <tr><td><code>json</code></td><td>One JSON object: <code>result</code>, <code>session_id</code>, usage and cost metadata, plus <code>structured_output</code> when a schema is supplied</td><td>A later step parses the findings — the normal CI shape</td></tr>
+            <tr><td><code>stream-json</code></td><td>Newline-delimited JSON events; the last line is a <code>result</code> message</td><td>You want progress while the run happens, or you are reconstructing subagent transcripts</td></tr>
+          </tbody>
+        </table>
+        <p><code>--json-schema</code> is what turns "JSON envelope" into "JSON <i>findings</i>". Supply a JSON Schema and the payload's <code>structured_output</code> field conforms to it:</p>
+        <pre><code>claude -p "Review the diff for security issues" \\
+  --output-format json \\
+  --json-schema '{"type":"object","properties":{"findings":{"type":"array","items":{
+      "type":"object",
+      "properties":{"file":{"type":"string"},"line":{"type":"integer"},
+                    "severity":{"type":"string"},"message":{"type":"string"}},
+      "required":["file","line","severity","message"]}}},
+    "required":["findings"]}' \\
+  | jq -c '.structured_output.findings[]'</code></pre>
+        <ul>
+          <li>An invalid schema is a <b>hard error</b>: <code>Error: --json-schema is not a valid JSON Schema</code> plus the validator's diagnostic. (Before v2.1.205 it was silently ignored and you got unstructured text back — a stale behaviour worth recognising if an item describes it.)</li>
+          <li><code>format</code> keywords such as <code>"format": "email"</code> are accepted but treated as <b>annotations, not enforcement</b>.</li>
+          <li>With <code>--output-format json</code> the payload carries <code>total_cost_usd</code> and a per-model breakdown, so a job can track its own spend. Both are <b>client-side estimates</b> and can differ from the bill.</li>
+          <li><code>stream-json</code>'s <code>system/init</code> event reports the model, tools, MCP servers and loaded plugins — including <code>plugin_errors</code> and <code>mcp_server_errors</code> arrays that are <b>omitted entirely when empty</b>. That omission is the point: a CI gate can fail the job on a non-empty array, catching an MCP server that never loaded while the run itself exited cleanly.</li>
+        </ul>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#get-structured-output" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Get structured output" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#read-session-metadata" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Read session metadata" (relevant section) — the <code>system/init</code> fields a CI gate reads <span aria-hidden="true">↗</span></a></p>` },
+      { id: "perms", h: "Permissions in a pipeline — nothing is there to say yes", html: `
+        <p>A CI runner has no human to approve a tool call, so an unapproved call does not pause the job — it fails it. <b>For <code>-p</code>, the built-in starting permission mode is Manual on every plan</b>, so a pipeline must state what it allows.</p>
+        <table>
+          <thead><tr><th>Lever</th><th>What it grants</th><th>The CI failure it prevents — or causes</th></tr></thead>
+          <tbody>
+            <tr><td><code>--allowedTools "Read,Edit,Bash"</code></td><td>Named tools, using <a href="https://code.claude.com/docs/en/settings-reference#permission-rule-syntax" target="_blank" rel="noopener noreferrer">permission rule syntax</a> — <code>Bash(git diff *)</code> prefix-matches, and <b>the space before <code>*</code> matters</b>: <code>Bash(git diff*)</code> would also match <code>git diff-index</code></td><td>The precise lever. Grant exactly the verbs the job needs</td></tr>
+            <tr><td><code>--permission-mode dontAsk</code></td><td>Everything in <code>permissions.allow</code> plus the read-only command set; <b>everything else is auto-denied</b> rather than prompted</td><td>The documented mode for locked-down CI. The session never waits for input — by construction</td></tr>
+            <tr><td><code>--permission-mode acceptEdits</code></td><td>File writes plus common filesystem commands (<code>mkdir</code>, <code>touch</code>, <code>mv</code>, <code>cp</code>)</td><td><b>The trap.</b> It does <i>not</i> cover other shell commands or network requests — those still need an allow rule, so a lint-fix job aborts the moment Claude tries to fetch something</td></tr>
+            <tr><td><code>--permission-mode bypassPermissions</code> (<code>--dangerously-skip-permissions</code>)</td><td>All checks off</td><td>Documented for <b>isolated containers/VMs only</b>. Refused as root or under <code>sudo</code>; offers no protection against prompt injection</td></tr>
+            <tr><td><code>--bare</code></td><td>Skips auto-discovery of hooks, skills, commands, subagents, plugins, MCP servers, auto memory, <b>and CLAUDE.md</b></td><td>Reproducibility: a teammate's <code>~/.claude</code> hook cannot change the result. Note it also drops your project context — see the tension below</td></tr>
+          </tbody>
+        </table>
+        <p><b>The security fact behind <code>--bare</code>, worth its own line:</b> without it, a <code>-p</code> session runs the hooks in a project's <code>.claude/settings.json</code> and connects the servers in its <code>.mcp.json</code> <i>even in a folder you have never trusted</i> — a <code>-p</code> session shows no workspace-trust dialog and no per-server approval prompt. For a pipeline that checks out untrusted PR branches, that is the whole threat model in one sentence.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#auto-approve-tools" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Auto-approve tools" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/permission-modes#allow-only-pre-approved-tools-with-dontask-mode" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Allow only pre-approved tools with dontAsk mode" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#start-faster-with-bare-mode" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Start faster with bare mode" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "isolation", h: "\"Session isolation\" means two different things — the exam tests both", html: `
+        <p>This phrase appears in the blueprint and in the question bank with two unrelated meanings. Read the stem for which one is being asked about, because the right answers live at different layers.</p>
+        <table>
+          <thead><tr><th></th><th>Reviewer isolation (3.6 Knowledge bullet 4)</th><th>Run isolation (infrastructure)</th></tr></thead>
+          <tbody>
+            <tr><td><b>The problem</b></td><td>The session that generated the code is worse at reviewing it — it retains its own reasoning context and is less likely to question its own decisions</td><td>State leaks between CI runs: files the last run wrote, env vars, installed packages, credentials, cached config</td></tr>
+            <tr><td><b>The fix</b></td><td>A <b>second, independent instance</b> with no prior reasoning context. Not a "now review yourself" instruction, and not more extended thinking</td><td>An <b>ephemeral container per job</b></td></tr>
+            <tr><td><b>The distractor</b></td><td>"Add a self-review step to the same session"; "turn on extended thinking"</td><td>"Call <code>/clear</code> at the start of the script"; "<code>--no-history</code>" (not a flag)</td></tr>
+          </tbody>
+        </table>
+        <p>Two details make the run-isolation answer easy once you see them. First, <code>/clear</code> is scoped to <b>the conversation</b> and nothing else — it cannot un-write a file. Second, a headless <code>claude -p</code> invocation <b>already starts a new session</b>, so <code>/clear</code> would be redundant even for the part it does cover. The isolation boundary has to be the machine.</p>
+        <p>The corollary is that continuity in CI is something you must ask for on purpose:</p>
+        <pre><code># capture the id, then target that exact session later in the job
+session_id=$(claude -p "Start the review" --output-format json | jq -r '.session_id')
+claude -p "Now check the migration files" --resume "$session_id"</code></pre>
+        <p><code>--continue</code> resumes the most recent conversation in the directory and skips background sessions; <code>--resume &lt;id&gt;</code> targets a specific one and, since v2.1.223, finds it in any project on the machine rather than only the current directory.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/headless#continue-conversations" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Continue conversations" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p><b>Anthropic's own review products are built this way</b>, which is the strongest available evidence that the blueprint bullet describes a real design rule and not a testing artifact. In Code Review, "multiple agents analyze the diff and surrounding code in parallel… Each agent looks for a different class of issue, then a <b>verification step checks candidates against actual code behavior</b> to filter out false positives." The generator does not grade itself; a separate pass does. Run locally, the same review "runs as a background subagent with <b>its own context window</b>, so it doesn't fill your conversation" — context separation, stated as the mechanism.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#how-reviews-work" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "How reviews work" (relevant section) — parallel agents plus a separate verification step <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#what-the-review-reads-and-edits" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "What the review reads and edits" (relevant section) — the local review as a subagent with its own context window <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none">Exam wording: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (the official Anthropic Claude Certification Program exam guide) p. 24, Task Statement 3.6, Knowledge bullet 4 ("why the same Claude session that generated code is less effective at reviewing its own changes compared to an independent review instance"), and p. 27, Task Statement 4.6, Knowledge bullets 1-2. Ephemeral-container <b>run</b> isolation is stated in neither document; that half is the layer argument, and the documentation supports only the claim about what <code>/clear</code> and the CLI do not reset. See <a class="pill" href="#/note/context-reset">Context Resets</a>.</p>` },
+      { id: "context", h: "What the CI run should be told — CLAUDE.md, prior findings, existing tests", html: `
+        <p>Three of the five Skills bullets in 3.6 are not about flags at all. They are about <b>what goes into the prompt</b>, and they share one idea: a CI reviewer that does not know what has already been said will say it again.</p>
+        <ul>
+          <li><b>CLAUDE.md is the named mechanism for project context</b> — testing standards, fixture conventions, review criteria. The blueprint says documenting these "improves test generation quality and reduces low-value test output". The GitHub Action page repeats it as a best practice, and adds the cost caveat: keep it concise, <b>Claude reads it on every run</b>.</li>
+          <li><b>Re-running a review after new commits: include the prior findings in context</b> and instruct Claude to report only new or still-unaddressed issues. Without that, every push re-posts the same comments and the reviewers stop reading them. This is the false-positive/trust problem from 4.1 arriving through a different door. Anthropic's own Code Review product names this pattern <b>re-review convergence</b> and makes it a tunable rule: "tell Claude how to behave when a PR has already been reviewed. A rule like <i>after the first review, suppress new nits and post Important findings only</i> stops a one-line fix from reaching round seven on style alone."</li>
+          <li><b>Generating tests: put the existing test files in context</b>, so the run does not propose scenarios the suite already covers. The same de-duplication logic appears in the documented <b>skip rules</b> — the named candidates include "anything your CI already enforces like linting or spellcheck". A second opinion on work another tool already did is noise at any quality level.</li>
+          <li><b>Raise the evidence bar rather than asking for less.</b> The documented <b>verification bar</b> knob is a criterion, not a mood: "behavior claims need a <code>file:line</code> citation in the source, not an inference from naming". Contrast that with 4.1's named failure — general instructions like "be conservative" or "only report high-confidence findings", which do not improve precision.</li>
+        </ul>
+        <p><b>The tension nobody states for you:</b> <code>--bare</code> skips CLAUDE.md, and 3.6 names CLAUDE.md as the context mechanism. Both are correct — they answer different questions. Reach for <code>--bare</code> when the job must be <b>reproducible across machines</b> and you pass what you need explicitly (<code>--append-system-prompt</code>, <code>--settings</code>, <code>--mcp-config</code>, <code>--add-dir</code>). Leave it off when the repo's own CLAUDE.md <i>is</i> the review criteria. Do not answer "use <code>--bare</code>" to a stem about giving the reviewer project standards.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/github-actions#define-project-standards-in-claude-md" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, GitHub Actions, "Define project standards in CLAUDE.md" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#claude-md" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "CLAUDE.md" (relevant section) — read at every level of the directory hierarchy, with newly introduced violations flagged <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#what-you-can-tune" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "What you can tune" (relevant section) — re-review convergence, verification bar, skip rules <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none">Exam wording for the same three ideas: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (the official Anthropic Claude Certification Program exam guide) p. 24, Task Statement 3.6, Knowledge bullet 3 and Skills bullets 3-5. The blueprint states them as prompt-construction skills; the documentation above states them as product features. Same idea, two altitudes — the exam asks at the blueprint's.</p>` },
+      { id: "codereview", h: "Three different CI surfaces — do not blend them", html: `
+        <p>The docs describe <b>three</b> ways Claude reviews a pull request, and items get built by attaching one surface's property to another's name. They differ in who runs the agent and how much you configure.</p>
+        <table>
+          <thead><tr><th></th><th>Code Review</th><th>GitHub Action</th><th><code>claude -p</code> in your own job</th></tr></thead>
+          <tbody>
+            <tr><td><b>What it is</b></td><td>A managed product: a fleet of agents on Anthropic infrastructure, plus a verification step, posting inline comments</td><td><code>anthropics/claude-code-action@v1</code> in your workflow</td><td>The CLI, in whatever runner you already have</td></tr>
+            <tr><td><b>You configure</b></td><td><code>CLAUDE.md</code> and <code>REVIEW.md</code> in the repo</td><td><code>prompt</code> plus <code>claude_args</code></td><td>Every flag yourself</td></tr>
+            <tr><td><b>Blocking?</b></td><td>No — findings are tagged by severity and "don't approve or block your PR"</td><td>Your workflow decides</td><td>Your exit code decides</td></tr>
+            <tr><td><b>Reach for it when</b></td><td>You want PR review and nothing custom</td><td>You want Claude on GitHub events with CLI control</td><td>The job is not a PR review at all — test generation, changelogs, triage</td></tr>
+          </tbody>
+        </table>
+        <p>Two Code Review details are worth memorising because they are <b>counter-intuitive and documented</b>:</p>
+        <ul>
+          <li><b>Effort trades coverage against confidence, in that direction.</b> "At <code>low</code> and <code>medium</code>, the review reports only the findings it's most confident in, so you see fewer false positives; <code>high</code> through <code>max</code> broaden coverage and may include findings the review is less sure about." Turning the dial up does <b>not</b> mean better findings — it means more of them, less certain. That is the precision/recall trade written as a product knob, and it is the same trade 4.1 tests as a prompt-design problem.</li>
+          <li><b><code>REVIEW.md</code> is not a second CLAUDE.md.</b> It reaches every finding and verification agent directly, so repo-specific checks "land more reliably than the same rules in a long <code>CLAUDE.md</code>". And length has a cost in both: "a long <code>REVIEW.md</code> dilutes the rules that matter most". Keep behaviour-changing instructions in <code>REVIEW.md</code>, general project context in <code>CLAUDE.md</code>.</li>
+        </ul>
+        <p>The stem-level tell: if a question describes tuning <i>what gets flagged</i> in a managed PR review, it is Code Review. If it describes <code>with:</code> keys in a workflow file, it is the Action. If it describes piping, exit codes, or parsing JSON, it is the CLI.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#tune-effort-and-arguments" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "Tune effort and arguments" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#review-md" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "REVIEW.md" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "gha", h: "The GitHub Action — one prompt input, everything else in claude_args", html: `
+        <p><code>anthropics/claude-code-action@v1</code> has a deliberately small surface, and the v1 rewrite is the point: the action <b>stopped inventing its own vocabulary and started forwarding to the CLI</b>. That is why the beta parameters did not get renamed — they got restructured.</p>
+        <table>
+          <thead><tr><th>Beta input</th><th>v1</th></tr></thead>
+          <tbody>
+            <tr><td><code>@beta</code> in <code>uses</code></td><td><code>@v1</code></td></tr>
+            <tr><td><code>mode</code></td><td><b>Removed</b> — the mode is auto-detected</td></tr>
+            <tr><td><code>direct_prompt</code></td><td><code>prompt</code></td></tr>
+            <tr><td><code>max_turns</code>, <code>model</code></td><td>Into <code>claude_args</code> as <code>--max-turns</code>, <code>--model</code></td></tr>
+            <tr><td><code>custom_instructions</code></td><td><b>No same-name flag</b> — becomes <code>--append-system-prompt</code></td></tr>
+          </tbody>
+        </table>
+        <p><b>What replaced <code>mode</code> is the detail the exam likes:</b> the presence of a <code>prompt</code> input <i>is</i> the mode switch.</p>
+        <ul>
+          <li><b>Automation mode</b> — <code>prompt</code> is set. Claude runs on any GitHub event, <code>schedule</code> included, without waiting for a mention. Results land in the workflow run log by default; posting a comment requires the prompt to direct it <b>and</b> a tool that can post.</li>
+          <li><b>Interactive mode</b> — no <code>prompt</code>. Claude waits for the trigger phrase (<code>@claude</code> by default) in an issue or PR comment, a PR review, or a new issue's title/body, and replies as a comment.</li>
+        </ul>
+        <p>Two gates run on the triggering actor in <b>both</b> modes, and the run fails when either rejects: the actor needs <b>write access</b> on issue and PR events (schedule events skip this, since no user authors them), and a <b>bot actor is rejected</b> unless listed in <code>allowed_bots</code> — which is what keeps two bots from triggering each other in a loop.</p>
+        <pre><code>- uses: anthropics/claude-code-action@v1
+  with:
+    prompt: "Review this PR for security issues"          # presence of this = automation mode
+    claude_args: "--max-turns 5 --model claude-sonnet-5 --allowedTools Read,Grep"
+    anthropic_api_key: \${{ secrets.ANTHROPIC_API_KEY }}</code></pre>
+        <p>Cost in a pipeline has two meters — <b>runner minutes</b> and <b>tokens</b> — and the documented levers are: specific requests, issue templates for up-front context, a concise CLAUDE.md, <code>--max-turns</code> in <code>claude_args</code>, workflow-level timeouts, and GitHub concurrency limits. Before any of those, apply the volume lever: <b>send the diff, not the tree</b>. And note the one that is <i>not</i> a lever here — the Message Batches API is asynchronous, so it cannot serve a blocking pre-merge gate no matter how good the discount is.</p>
+        <p>One operational trap that reads like a bug: <b>GitHub does not trigger workflows on commits made with the default <code>GITHUB_TOKEN</code></b>. If you pass <code>github_token: \${{ secrets.GITHUB_TOKEN }}</code>, your CI will not run on Claude's pushes — remove it so the action authenticates as the Claude GitHub App, or pass a custom app token. GitLab CI/CD has its own documented integration; the concepts carry over.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/github-actions#upgrade-from-beta" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, GitHub Actions, "Upgrade from beta" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/github-actions#interactive-and-automation-modes" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Interactive and automation modes" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/github-actions#manage-costs" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, "Manage costs" (relevant section) <span aria-hidden="true">↗</span></a></p>` },
+      { id: "selfcheck", h: "Self-check", html: `
+        <p>Answer before reading on. If an answer takes more than a sentence, the section above it is the one to reread.</p>
+        <ol>
+          <li><b>A CI job pipes a 40MB log into <code>claude -p</code> and dies instantly. Name the cause and the fix — and say why the fix is not a flag.</b><br>
+          <i>The 10MB piped-stdin cap; Claude Code exits with an error and a non-zero status rather than truncating. The fix is to write the log to a file and name the path in the prompt, so <code>Read</code> fetches it. No flag raises the cap.</i></li>
+          <li><b>Two jobs need "isolation". One says "the reviewer keeps agreeing with the code it just wrote"; the other says "the previous run's node_modules is still there". Different answers — what are they?</b><br>
+          <i>First: a second, independent instance with no prior reasoning context (3.6 Knowledge bullet 4 / 4.6). Second: an ephemeral container. <code>/clear</code> answers neither, and <code>-p</code> already starts a fresh session.</i></li>
+          <li><b>A workflow still on <code>@beta</code> passes <code>direct_prompt</code>, <code>custom_instructions</code>, <code>mode</code> and <code>max_turns</code>. Write the v1 equivalent from memory.</b><br>
+          <i><code>@v1</code>; <code>prompt:</code>; drop <code>mode</code> (auto-detected by whether <code>prompt</code> is present); <code>claude_args: "--max-turns N --append-system-prompt '…'"</code>. Only <code>custom_instructions</code> changes its name rather than just moving.</i></li>
+        </ol>` },
+      { id: "exam", h: "Exam reflex", html: `
+        <ul>
+          <li>Stem says <b>"the job hangs waiting for input"</b> → <code>-p</code> / <code>--print</code>. <code>CLAUDE_HEADLESS</code>, <code>--batch</code> and <code>&lt; /dev/null</code> are the standing distractors; the first two do not exist.</li>
+          <li>Stem says <b>"exits immediately with an error"</b> on a large piped input → the <b>10MB stdin cap</b>. The fix is a file path in the prompt, never a flag. "Silently failed" in an option is a tell that the option is wrong when the stem said "error".</li>
+          <li>Stem wants findings <b>parsed by a later step</b> → <code>--output-format json</code>, and <code>--json-schema</code> when the shape matters. Not "ask for markdown and parse it".</li>
+          <li>Stem says <b>"locked-down"</b> or "must never wait for input" → <code>dontAsk</code>. Stem says "apply the fixes" and the run dies on a <b>network</b> call → <code>acceptEdits</code> covers writes and common filesystem commands, not network or arbitrary shell.</li>
+          <li>Stem says <b>"completely isolated from previous runs"</b> → ephemeral container. <code>/clear</code> is a conversation reset, and <code>-p</code> already starts a fresh session.</li>
+          <li>Stem says <b>"review the code it just generated"</b> → a <b>separate instance without the generator's reasoning context</b>. Self-review instructions and extended thinking are the distractors.</li>
+          <li>Stem says <b>"duplicate comments on every push"</b> → feed the prior findings in and ask for new or still-unaddressed issues only. Stem says "tests duplicate existing coverage" → put the existing test files in context.</li>
+          <li>Stem asks about a <b><code>claude-code-action</code> beta→v1 migration</b> → restructure, not rename: one <code>prompt</code>, everything else as CLI flags in <code>claude_args</code>, <code>mode</code> auto-detected, <code>custom_instructions</code> → <code>--append-system-prompt</code>.</li>
+          <li>Stem worries about <b>token cost of reviewing the whole codebase</b> → send the diff. Batching is the wrong lever for a blocking gate; see <a class="pill" href="#/note/cost-levers">Cost Levers</a>.</li>
+          <li>There is <b>no <code>--project</code> flag</b>, and <code>-p</code> does not mean "project". Scope comes from the directory Claude Code starts in, plus <code>--add-dir</code>.</li>
+          <li>Stem describes <b>tuning what gets flagged</b> in a managed PR review → Code Review (<code>REVIEW.md</code>, <code>CLAUDE.md</code>). <code>with:</code> keys in a workflow file → the Action. Piping, exit codes, JSON parsing → the CLI.</li>
+          <li>Higher <b>effort</b> on a review means <b>broader coverage and lower confidence</b>, not better findings. If an option says raising effort reduces false positives, it has the direction backwards.</li>
+        </ul>` },
+    ],
+  },
+  {
+    id: "confidence-granularity", title: "Confidence Signals — Per Field, Per Document, Per Finding", topic: "ctx", domain: 5, tasks: ["5.5"], concept: "calibration", icon: "▤",
+    summary: "Where a confidence number is attached decides what it can do. The unit rule, the four design axes the distractors are built from — two of them stated outright in Anthropic's evaluation guidance — why aggregation only runs field-to-document, the narrow cases where a document-level score is the right instrument, and the three task statements that each treat confidence differently. Sourced to the official evaluation, structured-output and Code Review documentation (checked 1 Sep 2026), the official Anthropic exam guide PDF for the exam's own wording (pp. 22-23 and 27), and exam-preparation-guide.md §5 for the emitted field shape.",
+    source: ["Claude Docs — Structured outputs, \"Common use cases\"", "https://platform.claude.com/docs/en/build-with-claude/structured-outputs#common-use-cases"],
+    related: [
+      { id: "e13q27", why: "The observed miss: document-level chosen where the decision being made was per field." },
+      { id: "e13q26", why: "The other end of the same signal — a field genuinely absent from the source. No score and no retry recovers it." },
+      { id: "e5q14", why: "The prior question to ask: is a <b>deterministic</b> signal available? If yes, a self-rated score is the weaker instrument at any granularity." },
+    ],
+    sections: [
+      { id: "unit", h: "The unit rule — match the score to the decision", html: `
+        <p>One sentence carries this whole topic: <b>a confidence score must be emitted at the granularity of the decision it will drive.</b> Everything else follows.</p>
+        <table>
+          <thead><tr><th>The decision someone will make</th><th>The unit of that decision</th><th>Where the score belongs</th></tr></thead>
+          <tbody>
+            <tr><td>"Which extracted values should a reviewer look at?"</td><td>A field</td><td><b>Per field</b></td></tr>
+            <tr><td>"Should this whole document go to a human, or to the specialist queue?"</td><td>A document</td><td>Per document — usually <b>derived</b> from the field scores</td></tr>
+            <tr><td>"Which of these review findings do I trust enough to post?"</td><td>A finding</td><td><b>Per finding</b> (Task Statement 4.6)</td></tr>
+            <tr><td>"Is this ticket really a billing issue?"</td><td>A classification</td><td>Per classification — the whole output <i>is</i> one decision</td></tr>
+          </tbody>
+        </table>
+        <p>The missed item asked which prompt design "best supports later <b>calibration</b> against a labeled validation set", and calibration is the sharpest version of the rule, because calibration is a <i>measurement</i>. You group predictions by their stated confidence and check whether observed accuracy in each band matches the number. That requires the prediction and the ground-truth label to line up one-to-one. Field-level labels exist; a document-level score has nothing at that granularity to line up against.</p>
+        <p><b>Worked out:</b> a resume with nine correctly-extracted fields and one mangled <code>employment_dates</code> produces a single blended figure — say 0.88. That number is not right and not wrong. It cannot be scored against any label, and it cannot tell a reviewer which line to look at. The reviewer opens the whole resume and re-reads all ten fields, which is exactly the "limited reviewer time" the scenario was trying to spend well.</p>
+        <p>The official evaluation guidance arrives at the same place from the measurement side. Success criteria must be <b>specific and measurable</b> — "instead of <i>good performance</i>, specify <i>accurate sentiment classification</i>" — and one blended judgement is explicitly not enough: "a given use case, or even a specific success criteria for that use case, might require <b>several rubrics</b> for holistic evaluation." A per-field score is that principle applied to extraction: one rubric per field, because that is what you can actually grade.</p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/test-and-evaluate/develop-tests#define-your-success-criteria" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, Define success criteria and build evaluations, "Define your success criteria" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/test-and-evaluate/develop-tests#tips-for-llm-based-grading" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, "Tips for LLM-based grading" (relevant section) — several rubrics per use case; empirical scales over prose <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none">Exam wording: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (the official Anthropic Claude Certification Program exam guide) pp. 22-23, Task Statement 5.5 — the blueprint says "<b>field-level</b> confidence scores calibrated using labeled validation sets" in both a Knowledge and a Skills bullet. <code>exam-preparation-guide.md</code> §5 "Confidence and Human Review" (repo root, lines 550-566) states the measurement axes that presuppose it: "Build a labeled validation set and measure accuracy by document type, <b>field</b>, source quality, and confidence band." No documentation page states the field-versus-document rule in those words — the docs above establish the measurement principle it follows from, the blueprint supplies the exam's own phrasing, and the study guide names the axes.</p>` },
+      { id: "axes", h: "The four design axes — where the distractors come from", html: `
+        <p>Once you know an item is about confidence design, the four options are almost always one correct answer plus one violation on each of the other three axes. Naming the axes turns the question into a checklist.</p>
+        <table>
+          <thead><tr><th>Axis</th><th>Correct</th><th>The distractor's shape</th><th>Why it loses</th></tr></thead>
+          <tbody>
+            <tr><td><b>Granularity</b></td><td>One score per field</td><td>"A single overall document-level score"</td><td>Cannot be calibrated per field and cannot route a reviewer to the broken value</td></tr>
+            <tr><td><b>Scale consistency</b></td><td>The same numeric scale across all fields and all documents</td><td>Per-field verbal labels, or a scale that shifts by document type</td><td>Bands cannot be pooled, so no band ever collects enough observations to measure</td></tr>
+            <tr><td><b>Coverage</b></td><td>Every field, every time</td><td>"Score only the fields the model judges difficult"</td><td>Removes exactly the data needed to test the "easy" assumption — the easy fields have no observations, so no band exists for them</td></tr>
+            <tr><td><b>Form</b></td><td>A number (or a fixed ordinal scale)</td><td>"A textual explanation of its reasoning instead of a score"</td><td>Prose cannot be bucketed, so no calibration curve and no threshold. Useful <i>alongside</i> a number, never instead of one</td></tr>
+          </tbody>
+        </table>
+        <p>Note what the coverage distractor is really doing: it lets the model decide what gets measured. Self-selection is the failure — a field the model wrongly judges easy is precisely the field that silently produces wrong data with no signal attached. The same instinct in a different costume is "only emit a score when confidence is low", which is a threshold applied <b>before</b> anyone has measured where the threshold should be.</p>
+        <p><b>Two of these four axes are stated outright in the official evaluation guidance</b>, which is worth knowing because it makes them memorable rather than arbitrary:</p>
+        <ul>
+          <li><b>Form.</b> "Empirical or specific: for example, instruct the LLM to output only <i>correct</i> or <i>incorrect</i>, or to judge from a scale of 1-5. <b>Purely qualitative evaluations are hard to assess quickly and at scale.</b>" That sentence is the prose distractor's refutation, in Anthropic's own words.</li>
+          <li><b>Scale consistency.</b> Success criteria should be measurable: "use quantitative metrics or <b>well-defined qualitative scales</b>. Numbers provide clarity and scalability, but qualitative measures can be valuable if <b>consistently applied <i>along</i> with</b> quantitative measures." Note the preposition — <i>along with</i>, never instead of.</li>
+        </ul>
+        <p>So the form axis has a second half worth holding onto: reasoning text is not useless, it is just not a <i>routing signal</i>. The recommended shape carries both — a number for the machine, <code>review_reasons</code> for the human.</p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/test-and-evaluate/develop-tests#tips-for-llm-based-grading" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, "Tips for LLM-based grading" (relevant section) — empirical scales; purely qualitative evaluations do not scale <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/test-and-evaluate/develop-tests#define-your-success-criteria" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, "Define your success criteria" (relevant section) — measurable criteria, and qualitative measures only alongside quantitative ones <span aria-hidden="true">↗</span></a></p>` },
+      { id: "aggregate", h: "Aggregation runs one direction only", html: `
+        <p>Per-field and document-level are not rivals when you get the direction right. <b>You can always compute a document-level score from field scores. You can never recover field scores from a document score.</b> So emit the fine grain and derive the coarse one.</p>
+        <pre><code>{
+  "document_id": "resume_4471",
+  "fields": {
+    "full_name":        { "value": "Dilek Arslan", "confidence": 0.97 },
+    "email":            { "value": "d.arslan@example.com", "confidence": 0.96 },
+    "employment_dates": {
+      "value": "2019-03 – 2021-11",
+      "confidence": 0.54,
+      "requires_review": true,
+      "review_reasons": ["overlapping_ranges", "handwritten_annotation"]
+    }
+  },
+  "document_confidence": 0.54,        // derived: min over fields, not emitted by the model
+  "requires_review": true,
+  "review_reasons": ["field_below_threshold:employment_dates"]
+}</code></pre>
+        <ul>
+          <li><b>How to aggregate is a policy decision, not a model output.</b> <code>min</code> is the conservative default — one untrustworthy field makes the document untrustworthy. A mean is almost always wrong, because it lets nine easy fields wash out the one that matters. An impact-weighted rule (a wrong bank account outranks a wrong middle initial) is the version that survives contact with a real review queue.</li>
+          <li><b>Compute it outside the model.</b> The same rule the guide states for <code>requires_review</code>: a derived boolean with reasons, not a raw number handed to an agent to interpret.</li>
+          <li><b>Do not ask the model for both.</b> A model-emitted document score is not the aggregate of its own field scores, it is a separate guess — and now you have two numbers that disagree and no rule for which wins.</li>
+        </ul>
+        <p><b>Order the fields so evidence comes before the score.</b> The official grading guidance says why: "Encourage reasoning: ask the LLM to <b>reason first before producing an evaluation score</b>, and then discard the reasoning. This increases evaluation performance, particularly for tasks requiring complex judgment." A score emitted before its justification is a guess the justification then rationalises.</p>
+        <p>And one mechanical detail from the structured-output documentation, because it bites this exact schema shape: <b>required properties are emitted first, then optional ones</b>, each in schema order. So marking <code>evidence</code> optional silently pushes it <i>after</i> <code>confidence</code> and quietly undoes the ordering you just designed. Mark every property required, or account for the reordering.</p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/test-and-evaluate/develop-tests#tips-for-llm-based-grading" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, "Tips for LLM-based grading" (relevant section) — reason first, then produce the score <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/build-with-claude/structured-outputs#property-ordering" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, Structured outputs, "Property ordering" (relevant section) <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none">The aggregation policy is <b>not</b> stated by any of this repo's sources: no documentation page, no blueprint bullet, and no section of <code>exam-preparation-guide.md</code> names <code>min</code>, a mean, or an impact weighting. It is the segment-masking argument from Task Statement 5.5 ("aggregate accuracy metrics may mask poor performance on specific document types or fields", <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> pp. 22-23) applied inside a single document, and the direction claim — derivable downward, unrecoverable upward — is arithmetic rather than product behaviour. Treat it as reasoning, not as citation. The derived <code>requires_review</code>-plus-reasons shape <b>is</b> sourced: <code>exam-preparation-guide.md</code> §5 "Confidence and Human Review" (repo root, lines 550-574) gives the exact shape, with <code>value</code>, <code>confidence</code>, <code>requires_review</code> and <code>review_reasons</code> on one field.</p>` },
+      { id: "whendoc", h: "When a document-level score is the right instrument", html: `
+        <p>"Document-level is a distractor" is the exam reflex, and it is correct for extraction-review items. It is not a universal truth, and knowing the exception is what keeps the rule from being memorised wrongly.</p>
+        <p><b>A document-level score is right when the decision itself is about the whole document.</b> The clearest case is classification, and it is the shape the official documentation shows: one <code>category</code>, one <code>confidence</code>, for one piece of feedback. Nothing is being extracted field by field, so there is nothing finer to attach a number to.</p>
+        <pre><code>{ "category": "billing_dispute", "confidence": 0.91,
+  "tags": ["refund", "duplicate_charge"], "sentiment": "negative" }</code></pre>
+        <ul>
+          <li><b>Classification and routing</b> — "is this an invoice, a resume, or a contract?" One label, one score, one decision. A low score routes the document to a human <i>before</i> extraction, not after.</li>
+          <li><b>Accept/reject gates on a whole artifact</b> — a document that is too degraded to process at all. That judgement has no per-field version, because there are no fields yet.</li>
+          <li><b>Triage ordering</b> — deciding which of 4,000 queued documents a reviewer opens first. Ordering is a per-document operation; it just should be computed <i>from</i> the field scores rather than guessed independently.</li>
+        </ul>
+        <p><b>The line, in one sentence:</b> document-level is legitimate when the document is the unit of the decision, and wrong when it is standing in for per-field detail that the workflow actually needs. In the resume item, reviewers act field by field — so the document score is standing in for detail, and loses.</p>
+        <p class="srcline"><a href="https://platform.claude.com/docs/en/build-with-claude/structured-outputs#common-use-cases" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Docs, Structured outputs, "Common use cases" — the Classification example, where a single document-level <code>confidence</code> is the documented shape <span aria-hidden="true">↗</span></a></p>
+        <p class="srcline none">Read the citation above precisely: the documentation shows the <i>shape</i> of a document-level confidence field in a classification schema. It makes <b>no</b> claim about when to prefer that over a per-field score. The preference rule comes from <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> pp. 22-23 (the official Anthropic exam guide) and <code>exam-preparation-guide.md</code> §5 (repo root, lines 550-574) — both of which speak only about extraction review, so "document-level loses" is true within that scope and false outside it.</p>` },
+      { id: "three", h: "The same word in three task statements — and they do not agree", html: `
+        <p>Confidence shows up in 4.6, 5.2 and 5.5 with different verdicts attached. Items get built on the seam, so hold all three.</p>
+        <table>
+          <thead><tr><th>Task statement</th><th>What it says about confidence</th><th>Granularity</th></tr></thead>
+          <tbody>
+            <tr><td><b>4.6</b> — multi-instance and multi-pass review</td><td><b>Use it.</b> Run verification passes where the model self-reports confidence alongside each finding, to enable calibrated review routing</td><td><b>Per finding</b></td></tr>
+            <tr><td><b>5.5</b> — human review and calibration</td><td><b>Use it, after calibration.</b> Field-level scores calibrated against a labeled validation set, for routing review attention</td><td><b>Per field</b></td></tr>
+            <tr><td><b>5.2</b> — escalation and ambiguity</td><td><b>Do not use it.</b> Self-reported confidence is an unreliable proxy for actual case complexity, alongside sentiment</td><td>Per conversation — and that is the problem</td></tr>
+          </tbody>
+        </table>
+        <p><b>The reconciliation:</b> in 4.6 and 5.5 the score is measured against something — a label, a dismissal rate — and only the measured version is used. In 5.2 there is no labeled set of "cases that should have escalated"; the score would be an ungrounded number standing in for a decision that has explicit triggers available (an explicit request for a human, a policy gap, no meaningful progress). <b>A confidence score is a signal about an <i>output</i>. It was never a signal about a <i>situation</i>.</b></p>
+        <p><b>4.6's per-finding confidence is a shipped Anthropic product behaviour, not a thought experiment.</b> Code Review exposes it as an effort dial, and the documented direction is the one people get backwards: "at <code>low</code> and <code>medium</code>, the review reports only the findings it's <b>most confident in</b>, so you see fewer false positives; <code>high</code> through <code>max</code> broaden coverage and <b>may include findings the review is less sure about</b>." Per-finding certainty is the thing being thresholded, and raising coverage costs precision. That is 4.6's routing bullet with a knob attached.</p>
+        <p class="srcline"><a href="https://code.claude.com/docs/en/code-review#tune-effort-and-arguments" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">❖</span> Go to source — Claude Code Docs, Code Review, "Tune effort and arguments" (relevant section) — effort trades coverage against per-finding confidence <span aria-hidden="true">↗</span></a></p>
+        <p>The same test, sharpened by the mistake record on triage: <b>when a deterministic signal exists, it beats a self-rated one at any granularity.</b> Routing findings by source directory — security-critical paths to a human — needs no calibration at all, because a file path is not an estimate. Reach for confidence when the property you are routing on is only knowable semantically.</p>
+        <p>And the limit at the far end: confidence measures <i>how sure the model is about what the source says</i>. It does not measure whether the source is coherent. A self-contradicting invoice — line items summing to $1,240 against a printed total of $1,280 — can be read at 0.97 confidence, correctly, because both numbers are crisply printed. That is why 5.5 lists <b>two independent routing triggers</b>, low calibrated confidence and ambiguous/contradictory source content. Raising the threshold never catches the second one.</p>
+        <p class="srcline none">Exam wording for all three rows: <code>ClaudeCertifiedArchitectFoundationsGuide.pdf</code> (the official Anthropic Claude Certification Program exam guide) p. 27 (Task Statement 4.6, Skills bullet 3), pp. 22-23 (5.5, Knowledge bullet 3 and Skills bullets 3-4), p. 23 (5.2, Knowledge bullet 3). The <i>reconciliation</i> between them is this note's argument, not a documented claim — the documentation linked above shows the 4.6 behaviour shipping, but nowhere states why 5.2 excludes confidence while 4.6 and 5.5 accept it. Developed further in <a class="pill" href="#/note/extraction-validation">Extraction Feedback Loops</a> and <a class="pill" href="#/note/escalation-ambiguity">Escalation and Ambiguity</a>.</p>` },
+      { id: "eli5", h: "In plain terms", html: `
+        <p>Think of a graded exam paper instead of a document.</p>
+        <p><b>Per-field confidence</b> is the student writing a small "sure / not sure" mark next to <i>each answer</i>. Later the teacher compares those marks to the actual marking and learns something useful: "when this student writes 0.9, they are right 97% of the time; when they write 0.6, they are right 61% of the time." Now the marks mean something, and the teacher can skip the 0.9s and check the 0.6s.</p>
+        <p><b>Document-level confidence</b> is the student writing one number at the top of the page: "I'm about 88% sure of this paper." The teacher cannot check that against anything — the paper is not right or wrong, its ten answers are — and it does not say <i>which</i> answer to look at. So the teacher re-marks the whole paper, and the number saved nobody any time.</p>
+        <p><b>Scoring only the hard questions</b> is the student marking "not sure" only where they felt shaky. Sounds efficient. But the questions they felt fine about and got wrong now carry no mark at all, and those are the dangerous ones — nobody will ever check them.</p>
+        <p><b>Writing a paragraph instead of a number</b> is the student explaining their reasoning next to every answer. Genuinely helpful to a human reading one paper. Useless for sorting a thousand papers into "check" and "skip", because you cannot sort paragraphs.</p>
+        <p>And the one exception: if the only question is "is this a maths paper or a history paper?", then one number at the top is exactly right — because that is the only decision being made.</p>` },
+      { id: "selfcheck", h: "Self-check", html: `
+        <p>Answer before reading on. If an answer takes more than a sentence, the section above it is the one to reread.</p>
+        <ol>
+          <li><b>Give the one-line rule that decides per-field versus document-level, then apply it to two stems: "reviewers open the flagged fields" and "route the file to the invoice pipeline or the resume pipeline".</b><br>
+          <i>The score's unit must match the decision's unit. First stem: the decision is per field → per-field scores. Second: the decision is about the whole document (a classification) → one document-level score is correct there.</i></li>
+          <li><b>Two options both emit per-field scores. One scores every field on one numeric scale; the other scores only the fields the model judges hard. Why does the second lose, in one sentence?</b><br>
+          <i>It lets the model choose what gets measured, so a field it wrongly judged easy produces wrong data with no signal — and those fields never populate a confidence band, so nothing about them can be calibrated.</i></li>
+          <li><b>4.6 says have the model self-report confidence; 5.2 says self-reported confidence is unreliable. Reconcile them.</b><br>
+          <i>4.6 and 5.5 use the score only after it is measured against something (labels, dismissal rates), and it describes an <b>output</b>. 5.2 would be using it ungrounded as a proxy for a <b>situation</b> — case complexity — where explicit triggers exist instead.</i></li>
+        </ol>` },
+      { id: "exam", h: "Exam reflex", html: `
+        <ul>
+          <li>Extraction stem + "so reviewers can prioritize" or "calibrate against a labeled set" → <b>per field, consistent numeric scale, every field</b>. All three qualifiers matter; the distractors each break one.</li>
+          <li>"A single overall document-level confidence score" in an <b>extraction</b> item is a distractor. In a <b>classification</b> item it is the documented shape. Read the unit of the decision, not the phrase.</li>
+          <li>"Score only the difficult fields" → coverage failure. The unscored fields are the blind spot, and the model chose them.</li>
+          <li>"Explain its reasoning instead of a number" → form failure. Reasoning goes <i>next to</i> the number, as <code>review_reasons</code>.</li>
+          <li>If both a per-field option and a document-level option look right, ask <b>who acts on the number and at what grain</b>. Aggregation is free downward, impossible upward.</li>
+          <li>A model-emitted score competes with a deterministic signal (file path, document type, source system) → the deterministic signal wins.</li>
+          <li>Contradictory or ambiguous <b>source content</b> → the second routing trigger, not a threshold change. Confidence was never measuring the document's coherence.</li>
+          <li>"Purely qualitative evaluations are hard to assess quickly and at scale" is the documented refutation of every prose-instead-of-a-number option. Qualitative goes <b>alongside</b> quantitative, never in place of it.</li>
+          <li>Ask for <b>reasoning before the score</b>, not after — and mark every schema property required, or optional fields get reordered to the end.</li>
+          <li>The number is not usable until it has been measured. The procedure — labeled set, bands, measured accuracy, threshold read off the curve — is in <a class="pill" href="#/note/confidence-review">Confidence Calibration and Human Review Routing</a>; this note is only about <i>where the number is attached</i>.</li>
+        </ul>` },
     ],
   },
 ];
