@@ -86,8 +86,8 @@ corrected rather than a mismatched task bolted on.
 
 ## Question bank (`#/bank`)
 
-529 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
-+ BONUS Set 2, exams 1/2/3/5/6), 159 from CertSafari across six attempts (exams 7 and 9–13), and 60
+646 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
++ BONUS Set 2, exams 1/2/3/5/6), 276 from CertSafari across eleven attempts (exams 7 and 9–18), and 60
 from a second Udemy course ("Claude Certified Architect Foundations - 6 Practice Exams", Practice
 Test 1, exam 8).
 Separate from `M_BUILTIN` in every way — do not merge them.
@@ -131,14 +131,25 @@ The pool serves questions at random, so attempts overlap: 109 attempt rows → 1
 **99 fresh** after dropping the six already in exam 7. Dedup is by `cs-<questionId>` and skipped
 records are printed by the merge script, never silently dropped. A question's `q` is its position in
 the attempt that first served it, so numbering inside an exam has gaps — that is deliberate.
-Counts: E9 9 · E10 9 · E11 27 · E12 27 · E13 27. Domains across all CertSafari records:
-agent 36 · cc 34 · pe 31 · ctx 31 · tool 27.
+Counts: E9 9 · E10 9 · E11 27 · E12 27 · E13 27.
+
+**CertSafari attempts 7–11 (`exam: 14`–`18`).** Five more, added 2026-09-03, same chronological rule:
+14 = `v7sye6iaTWhzBDL` (60q, 57/60) · 15 = `M027Ujgzxp796Sj` (20q, 18/20) ·
+16 = `Zeo8yTels878A1f` (10q, 10/10) · 17 = `ntMcV59HYcOP6qI` (20q, 19/20) ·
+18 = `RO8Ojd9pDbZc6B6` (20q, 20/20). 130 attempt rows → **117 fresh** after 24 dedup skips; none of
+the new records is `stale`. Counts: E14 54 · E15 18 · E16 9 · E17 18 · E18 18. Domains across all
+CertSafari records: ctx 87 · tool 54 · agent 48 · cc 45 · pe 42.
+
+The `get-quizzes` endpoint lists every attempt for a `user_id`, so "which of these is new" is a
+set difference against `data/certsafari/attempts.json`, not a guess. The only thing that has to come
+from the browser is the `user_id` itself (`localStorage.certsafari_user_id`), once.
 
 **Three CertSafari-only record fields.** `note` carries the user's own study notes from the platform,
 bound by `question_id` and therefore independent of which attempt's record survived dedup — a note
 written during exam 13 lands on an exam 7 record when that is where the question lives. `miss` marks
 a question answered wrong in *any* attempt. `stale` plus `successor` marks a question CertSafari has
-retired upstream (`is_active: false`), which happens often enough to matter: 7 of the 99 new records.
+retired upstream (`is_active: false`), which happens often enough to matter: 7 of the 99 records added
+on 2026-08-31, and none of the 117 added on 2026-09-03.
 Retired questions are kept, because they are what was actually answered. The `#/qnotes` screen reads
 `note`; it is gated on the bank being unlocked, because the notes ride inside the ciphertext.
 
@@ -217,6 +228,41 @@ the answer matched the key but not the docs, so both answer boxes stay visible.
 Three records rest on `exam-preparation-guide.md` alone and render the `.srcline none` variant with
 no doc link: `e12q1` (what a self-correction turn should contain), `e13q26` (retry limits) and
 `e13q27` (per-field confidence).
+
+**Verified so far (exams 14–18).** All 6 questions missed across attempts 7–11, plus the 17 answered
+correctly but carrying a study note, were checked against primary docs on 2026-09-03 and written as
+`M_BUILTIN` records (`e14q7` … `e18q12`); the 17 carry `hit: true`. Six of the 23 rest on the guide
+or the blueprint alone and render `.srcline none`: `e14q38`, `e15q3`, `e15q6`, `e15q8`, `e17q13`,
+`e17q17`.
+
+**One hard conflict, and it is the exam's own subject.** `e14q41` (exam 14 q41) keys "offer to explain
+and resolve the overage, escalate only if the customer repeats the request" for a customer who wrote
+"connect me to a human agent right now". The blueprint splits exactly this into two Skills bullets
+under Task Statement 5.2 (PDF pp.20-21): *"Honoring explicit customer requests for human agents
+immediately without first attempting investigation"* and, separately, *"Acknowledging frustration
+while offering resolution when the issue is within the agent's capability, escalating only if the
+customer reiterates their preference."* The key applies the second branch to a first-branch stem, and
+justifies it by citing Anthropic's own help centre (Fin, the support bot) — a description of
+Anthropic's support queue, not design guidance. **The same pool keys the opposite ten days later**:
+`e17q13` (exam 17 q13), same explicit demand, keys immediate escalation. `e14q41` is `verdict:
+"conflict"`, `e17q13` is `verdict: "ok"`, and each record points at the other.
+
+**Two records where the key is right and its stated reason is not.** `e18q2` credits "the SDK's
+automatic retry mechanism" for a subagent retrying a transient database reset; no docs page describes
+SDK-level auto-retry of tool failures — the answer follows from subagent context isolation plus the
+guide's retryable/non-retryable error taxonomy. `e14q56` (orchestrator surfaces conflicting subagent
+findings with sources) is supported by the provenance guidance, not by any quotable orchestration
+rule: the multi-agent engineering post documents synthesis and a `CitationAgent`, not "present the
+conflict to the user".
+
+`support.claude.com` was added to `ALLOWED_DOC_HOSTS` in `scripts/validate.mjs` for `e14q41` and
+`e17q19` (Persona identity verification). It is Anthropic's help centre — official, but product
+support rather than developer documentation, and a record leaning on it says so in its `why`.
+
+One new note came out of these attempts: `compaction-server` (Server-Side Compaction — What Survives
+the Summary, tasks 5.1/5.6). Three existing notes grew a claim each — `builtin-tools` (Grep
+`multiline` versus output modes), `mcp-primitives` (Claude Code auto-refreshes on `list_changed`),
+`escalation-ambiguity` (now links both sides of the conflict above).
 
 **Dropping questions.** Some bank questions are far off exam format or teach nothing; they are
 removed in two stages. Stage A is in the browser: the "Bu soruyu ele" button (drill, review card, or

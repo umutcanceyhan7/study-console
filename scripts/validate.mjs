@@ -22,6 +22,9 @@ const ALLOWED_DOC_HOSTS = new Set([
   "modelcontextprotocol.io",
   "anthropic.com",
   "www.anthropic.com",
+  /* Anthropic'in kendi yardım merkezi. Ürün-destek sayfası, geliştirici
+     dokümanı değil — bir kaydın iddiası buraya dayanıyorsa `why` bunu söyler. */
+  "support.claude.com",
 ]);
 
 const VALID_VERDICTS = new Set(["ok", "conflict", "dated", "authoritative", "unverified"]);

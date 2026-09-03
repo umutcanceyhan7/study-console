@@ -71,10 +71,15 @@ BANK_PASSWORD='...' node scripts/build-bank.mjs && node scripts/validate.mjs
 **Sonuç: Udemy id'leri ile `M_BUILTIN` id'leri eşleşmez.** `M_BUILTIN` artık var
 olmayan bir revizyondan geliyor; ortak eksen yalnızca `topic`. Eşleme uydurma.
 
-## CertSafari (exam 7 ve 9–13) — yapılan iş
+## CertSafari (exam 7 ve 9–18) — yapılan iş
 
 Adres: `https://www.certsafari.com/anthropic/claude-certified-architect-foundations`
-Ücretsiz, CCAR-F 1.0 rehberine göre etiketli. Altı deneme çözüldü, 159 soru bankada.
+Ücretsiz, CCAR-F 1.0 rehberine göre etiketli. On bir deneme çözüldü, 276 soru bankada.
+
+**Yeni denemeyi bulmanın yolu tahmin değil, küme farkı.** `get-quizzes` `user_id` için tüm
+denemeleri döndürür (§4); listedeki `id`'ler `data/certsafari/attempts.json` içindekilerle
+karşılaştırılır, fark yeni denemedir. Sıra `created_at`'e göre kronolojik verilir. Tarayıcı yalnızca
+`user_id` için, o da bir kez gerekir.
 
 1. **Sorular giriş istemez.** `POST /api/quiz-nth-question {quiz_id, question_index}`
    yalnızca sınav token'ını ister — çerez, oturum, user_id yok. `quiz_id`, sonuç
@@ -148,6 +153,10 @@ Hangi denemelerin işleneceği `data/certsafari/attempts.json` manifestinde yaza
 ```json
 [{ "exam": 9,  "quizId": "K61jtZxsjC3BKZK", "n": 10, "label": "…" }, …]
 ```
+
+Sıra önemli: önce `fetch-attempt.sh` (deneme başına iki istek — yanlışların ve notların hemen
+görünür), sonra `scrape.sh` (soru başına bir istek, dakikada ~50 limitine takılır). 2026-09-03'te
+eklenen beş deneme 130 satır / 117 yeni soru getirdi; 24 kayıt tekrar olduğu için atlandı.
 
 Birleştirme ve gömme:
 
