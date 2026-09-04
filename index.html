@@ -7858,23 +7858,52 @@ function bankPick(sid, idx){
   const s = BSTORE.sessions[sid];
   if (!s || s.done) return;
   const id = s.ids[s.i];
-  if (s.picks[id] !== undefined) return;   /* aynı soruda ikinci tıklama yok */
+  const prev = s.picks[id];
+
+  /* Anında geri bildirim modunda cevapla birlikte açıklama da açıldı; ikinci
+     tıklama yok, yoksa doğruyu gördükten sonra "düzeltmek" mümkün olurdu.
+     Sınav modunda hiçbir şey açılmıyor — orada cevabı değiştirmek hile değil,
+     gerçek sınavın da yaptığı şey. */
+  if (prev !== undefined && s.mode === "instant") return;
 
   s.picks[id] = idx;
   const ok = bankById(id).correct === idx;
-  (BSTORE.attempts[id] = BSTORE.attempts[id] || []).push({ t: Date.now(), picked: idx, ok });
-  /* Alt konu modunda doğru bilinen soru havuzdan kalıcı düşer. Sınav modunda
-     da burada olur — pick her iki modda da anında kaydediliyor, geç kalan tek
-     şey açıklamanın gösterilmesi. */
-  if (s.kind === "task" && ok && BSTORE.taskSolved.indexOf(id) < 0) BSTORE.taskSolved.push(id);
+  /* Fikir değiştirmek yeni bir deneme değil: aynı soruda son kaydı tazele,
+     üst üste yığma — yoksa üç kez tıklayan üç deneme yapmış sayılırdı. */
+  const log = (BSTORE.attempts[id] = BSTORE.attempts[id] || []);
+  if (prev !== undefined && log.length) log[log.length - 1] = { t: Date.now(), picked: idx, ok };
+  else log.push({ t: Date.now(), picked: idx, ok });
+
+  /* Alt konu modunda doğru bilinen soru havuzdan kalıcı düşer. Anında geri
+     bildirimde cevap kesinleşmiş olduğu için karar burada verilebilir; sınav
+     modunda cevap hâlâ değişebildiği için karar testin sonuna bırakılır
+     (bankCommitSolved). */
+  if (s.kind === "task" && s.mode === "instant" && ok && BSTORE.taskSolved.indexOf(id) < 0) {
+    BSTORE.taskSolved.push(id);
+  }
   bankPersist();
   renderDrill(sid);
+}
+
+/* Sınav modunda pick anında "bu soru bitti" denemez, cevap değişebilir. Bu
+   yüzden havuzdan düşürme tek noktadan, test bittiğinde yapılır — sonuç
+   ekranına giden her yol (son sorudan sonraki bankNext ve bankFinish) buradan
+   geçer. Anında geri bildirim turları zaten pick anında işaretlendi, tekrar
+   eklemeyi indexOf koruması yutar. */
+function bankCommitSolved(s){
+  if (s.kind !== "task") return;
+  for (const id of s.ids) {
+    const p = s.picks[id], q = bankById(id);
+    if (p !== undefined && q && q.correct === p && BSTORE.taskSolved.indexOf(id) < 0) {
+      BSTORE.taskSolved.push(id);
+    }
+  }
 }
 
 function bankNext(sid){
   const s = BSTORE.sessions[sid];
   if (!s) return;
-  if (s.i >= s.ids.length - 1) { s.done = true; bankPersist(); App.router.go("#/review/" + sid); return; }
+  if (s.i >= s.ids.length - 1) { s.done = true; bankCommitSolved(s); bankPersist(); App.router.go("#/review/" + sid); return; }
   s.i++; bankPersist(); renderDrill(sid);
 }
 
@@ -7958,7 +7987,7 @@ function bankCopyExcluded(){
 function bankFinish(sid){
   const s = BSTORE.sessions[sid];
   if (!s) return;
-  s.done = true; bankPersist(); App.router.go("#/review/" + sid);
+  s.done = true; bankCommitSolved(s); bankPersist(); App.router.go("#/review/" + sid);
 }
 
 /* ---- Çözücü (#/drill/<sid>) ---- */
@@ -8008,7 +8037,7 @@ function renderDrill(sid){
     else if (!reveal && k === picked) cls += " sel";
     const fb = reveal && q.feedbacks[k]
       ? `<p class="optfb">${q.feedbacks[k]}</p>` : "";
-    return `<button class="${cls}" type="button" ${answered ? "disabled" : ""} onclick="bankPick('${sid}', ${k})">
+    return `<button class="${cls}" type="button" ${reveal ? "disabled" : ""} onclick="bankPick('${sid}', ${k})">
       <span class="key" aria-hidden="true">${k + 1}</span>
       <span class="txt">${a}${fb}</span>
     </button>`;
@@ -8043,7 +8072,7 @@ function renderDrill(sid){
       <button class="btn" onclick="bankExcludeCurrent('${sid}')" title="Soruyu havuzdan çıkar — #/bank altındaki Elenenler listesinden geri alınır">Bu soruyu ele</button>
       <button class="btn" onclick="bankFinish('${sid}')">Testi bitir</button>
     </div>
-    <p class="small quiet" style="margin-top:14px">Klavye: <code>1</code>-<code>4</code> şık · <code>Enter</code> sonraki · <code>F</code> işaretle · <code>X</code> ele</p>`;
+    <p class="small quiet" style="margin-top:14px">Klavye: <code>1</code>-<code>4</code> şık · <code>Enter</code> sonraki · <code>F</code> işaretle · <code>X</code> ele${s.mode === "exam" ? " · sınav modunda cevabını değiştirebilirsin, açıklamalar sonuçta" : ""}</p>`;
 }
 
 /* ---- Sonuç (#/review/<sid>) ---- */
