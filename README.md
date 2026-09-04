@@ -14,6 +14,9 @@ Tek dosya. Harici bağımlılık yok, build adımı yok, framework yok.
 index.html          uygulamanın tamamı (HTML + inline CSS + inline JS)
 PRODUCT.md          strateji: kullanıcı, amaç, kişilik, anti-referanslar, ilkeler
 DESIGN.md           görsel sistem: OKLCH token'ları, tip ölçeği, bileşen kuralları
+INGEST.md           soru bankasına yeni sınav çekme yolu
+SCHEMA.md           soru kaydının zorunlu şeması (build'de denetlenir)
+scripts/tasks.mjs   30 blueprint task statement'ı — tek kaynak
 scripts/validate.mjs  CI doğrulaması (sıfır bağımlılık, yalnızca Node stdlib)
 ```
 
@@ -26,6 +29,7 @@ Tüm içerik `index.html` içindeki JS nesnelerinde yaşar:
 | Nesne | İçerik |
 |---|---|
 | `TOPICS` | 5 sınav alanı (`pe`, `tool`, `cc`, `agent`, `ctx`) |
+| `TASKS` | 30 blueprint alt başlığı (`1.1` … `5.6`); `#/tasks` bunu kullanır |
 | `CONCEPTS` | soruları çapraz bağlayan kavram etiketleri |
 | `M_BUILTIN` | doğrulanmış yanlış kayıtları |
 | `EXAMS_BUILTIN` | sınav başına skor özeti |

@@ -92,7 +92,25 @@ from a second Udemy course ("Claude Certified Architect Foundations - 6 Practice
 Test 1, exam 8).
 Separate from `M_BUILTIN` in every way — do not merge them.
 The scrape-to-embed pipeline for both platforms is written down in `INGEST.md` — read it before
-adding another exam.
+adding another exam. The record schema itself — every field, and which violation kills the build —
+lives in `SCHEMA.md`, and it is enforced, not advisory.
+
+**Blueprint task statements and `#/tasks`.** A record's `subdomain` string
+(`"Subdomain 2.4: Integrate MCP servers into Claude Code and agent workflows"`) is validated at build
+time against `scripts/tasks.mjs` — the 30 task statements, titles taken verbatim from the PDF
+(pp.5-23), which match CertSafari's strings 30/30. `build-bank.mjs` writes the bare id
+(`task: "2.4"`) into the record and **drops the long string**: the title's single owner is the
+`TASKS` table in `index.html`, whose copy `validate.mjs` asserts against `scripts/tasks.mjs`.
+
+`#/tasks` (Alt konu sınavı) draws only from tagged records — **276 of 646 today, all CertSafari**;
+Udemy questions carry no subdomain and are invisible there. A question leaves that pool permanently
+once answered **correctly** (`BSTORE.taskSolved`, localStorage, exportable from the screen); a wrong
+answer keeps it in rotation. Untagged questions are tagged by hand through
+`scripts/bank-subdomains.json` (`{ id: { task, why } }`, committed, `why` mandatory because a hand
+tag is an inference) — data, not code: add a line, rebuild, the question appears. The blob's meta
+carries a `tasks` histogram so the picker shows real counts while the bank is still locked.
+`NOTES[].tasks` and `USAGE[].tasks` are now checked for membership in that table, not just against a
+regex. Full rules in `SCHEMA.md`.
 
 **Id namespace.** Bank ids are `b<udemyAssessmentId>`; mistake records are `e<exam>q<n>`. They must
 never collide. The course rewrote its entire bank in August 2026 (`EXAMS v2`), so `M_BUILTIN`'s
@@ -114,8 +132,8 @@ Counts (Udemy only): cc 77 · agent 76 · tool 59 · pe 49 · ctx 49.
 **CertSafari (`exam: 7`, ids `bcs-<questionId>`).** Free platform, no account — identity is an
 anonymous UUID in `localStorage.certsafari_user_id`. Domains come from the API's own `domain`
 field (`"Domain 3: Claude Code Configuration & Workflows"`), mapped in `SECTION_TO_TOPIC` alongside
-the bare Udemy names — still no inference. The blueprint `subdomain` string is kept per record, and
-`source: "certsafari"` marks the platform. Text arrives as markdown, not HTML, so
+the bare Udemy names — still no inference. The blueprint `subdomain` string is kept per record (it
+becomes the normalized `task` field, see below), and `source: "certsafari"` marks the platform. Text arrives as markdown, not HTML, so
 `data/certsafari/merge-into-raw.mjs` escapes it and converts `` `code` ``/`**bold**` before it
 reaches the bank (which renders with `innerHTML`). Every question carries an explanation for all
 four options; the UI already shows the correct option's and the picked option's.

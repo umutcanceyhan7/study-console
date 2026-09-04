@@ -13,6 +13,7 @@ kaydına yazılır (bkz. CLAUDE.md).
 ```
 <platform>  →  data/<kaynak>/*.json        (ham yakalama, gitignore)
             →  data/bank-raw.json          (birleştirilmiş ham kayıtlar)
+            →  scripts/bank-subdomains.json (elle alt başlık etiketi, commit'li)
             →  scripts/bank-excluded.json  (elenen id'ler, commit'li)
             →  scripts/build-bank.mjs      (normalize → eleme → gzip → AES-256-GCM → index.html)
             →  node scripts/validate.mjs
@@ -29,20 +30,19 @@ olmayan bir id build'i düşürür — sessizce yutulmaz.
 BANK_PASSWORD='...' node scripts/build-bank.mjs && node scripts/validate.mjs
 ```
 
-### `bank-raw.json` kayıt şeması
+### Kayıt şeması
 
-| alan | zorunlu | not |
-|---|---|---|
-| `aid` | ✔ | platformun kendi soru id'si. Yoksa sentetik (`x6-61`). Final id `b<aid>`. |
-| `exam` | ✔ | sınav numarası. UI'da `E<exam>·S<q>` diye görünür. |
-| `q` | ✔ | sınav içi sıra |
-| `type` | ✔ | `"multiple-choice"` — başka tip build'i düşürür |
-| `section` | ✱ | platformun domain adı; `SECTION_TO_TOPIC` ile eşlenir |
-| `topic` | ✱ | domain elle atandıysa. `section` ile **birlikte olamaz** |
-| `question`, `answers[]` | ✔ | HTML olarak saklanır, `innerHTML` ile çizilir |
-| `correct` | ✔ | tek elemanlı dizi, `["c"]` biçiminde harf |
-| `explanation`, `feedbacks[]` | — | platformun açıklaması; doğrulanmamış sayılır |
-| `scenario` | — | senaryo adı taşıyan sınavlarda korunur |
+Alan alan tarif `SCHEMA.md`'de — hem `bank-raw.json` hem normalize edilmiş kayıt,
+hangi ihlalin build'i düşürdüğüyle birlikte. Burada tekrarlanmıyor: iki kopyadan biri
+kod değişince sessizce eskir.
+
+Yeni sınav eklerken oradan iki şeye özellikle bak:
+
+- **`section`/`topic`** — domain tahmin edilmez, platformun kendi alanından gelir.
+- **`subdomain`** — blueprint alt başlığı. Biçimi zorunlu (`Subdomain 2.4: <PDF başlığı>`),
+  bozuksa build düşer. Alan yoksa soru `#/bank`'ta çalışır ama `#/tasks`
+  (alt konu sınavı) havuzunda **görünmez**; sonradan `scripts/bank-subdomains.json`
+  ile elle etiketlenebilir.
 
 ## Udemy (exam 1, 2, 3, 5, 6) — yapılan iş
 

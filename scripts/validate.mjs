@@ -12,8 +12,10 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { Script, createContext } from "node:vm";
+import { TASK_STATEMENTS } from "./tasks.mjs";
 
 const FILE = "index.html";
+const SUBDOMAINS = "scripts/bank-subdomains.json";
 
 const ALLOWED_DOC_HOSTS = new Set([
   "docs.anthropic.com",
@@ -36,6 +38,11 @@ const VALID_CONTRAST_AXES = new Set(["simplicity", "determinism", "cost", "laten
 
 /* Veri bloğundan doldurulur; banka denetimi konu anahtarlarını buradan okur. */
 let TOPIC_KEYS = null;
+
+/* Blueprint alt başlıkları. scripts/tasks.mjs tek kaynak; index.html kendi
+   kopyasını taşımak zorunda (tek dosya kuralı), o yüzden burada ikisinin
+   ayrışmadığı doğrulanır. */
+const TASK_IDS = new Set(Object.keys(TASK_STATEMENTS));
 
 const errors = [];
 const warnings = [];
@@ -131,7 +138,7 @@ if (js && errors.length === 0) {
     try {
       const ctx = createContext({});
       D = new Script(
-        `(() => { ${dataSrc}\n return { TOPICS, DOMAINS, CONCEPTS, NOTES, USAGE, M_BUILTIN, EXAMS_BUILTIN }; })()`,
+        `(() => { ${dataSrc}\n return { TOPICS, DOMAINS, TASKS, CONCEPTS, NOTES, USAGE, M_BUILTIN, EXAMS_BUILTIN }; })()`,
         { filename: "data" }
       ).runInContext(ctx, { timeout: 5000 });
     } catch (e) {
@@ -139,10 +146,29 @@ if (js && errors.length === 0) {
     }
 
     if (D) {
-      const { TOPICS, DOMAINS, CONCEPTS, NOTES, USAGE, M_BUILTIN, EXAMS_BUILTIN } = D;
+      const { TOPICS, DOMAINS, TASKS, CONCEPTS, NOTES, USAGE, M_BUILTIN, EXAMS_BUILTIN } = D;
       const topicKeys = new Set(Object.keys(TOPICS));
       TOPIC_KEYS = topicKeys;
       const conceptKeys = new Set(Object.keys(CONCEPTS));
+
+      /* TASKS ↔ scripts/tasks.mjs. Kopya sessizce ayrışırsa #/tasks ekranı
+         PDF'te olmayan bir başlık gösterir ya da bankadaki `task` alanının
+         karşılığı bulunamaz — ikisi de gözle fark edilmez. */
+      {
+        const seen = new Set(Object.keys(TASKS ?? {}));
+        for (const id of TASK_IDS) {
+          if (!seen.has(id)) { fail(`TASKS: '${id}' eksik (scripts/tasks.mjs'te var).`); continue; }
+          const a = TASKS[id], b = TASK_STATEMENTS[id];
+          if (a.title !== b.title) fail(`TASKS[${id}]: başlık scripts/tasks.mjs ile aynı değil.`);
+          if (Number(a.domain) !== b.domain) fail(`TASKS[${id}]: domain ${a.domain}, beklenen ${b.domain}.`);
+          if (Number(a.pdf) !== b.pdf) fail(`TASKS[${id}]: PDF sayfası ${a.pdf}, beklenen ${b.pdf}.`);
+          if (!String(a.short || "").trim()) fail(`TASKS[${id}]: 'short' boş — chip etiketsiz çizilir.`);
+          if (id.split(".")[0] !== String(a.domain)) fail(`TASKS[${id}]: id öneki domain ${a.domain} ile uyuşmuyor.`);
+        }
+        for (const id of seen) {
+          if (!TASK_IDS.has(id)) fail(`TASKS: '${id}' scripts/tasks.mjs'te yok — blueprint'te olmayan alt başlık.`);
+        }
+      }
       const DOMAIN_KEYS = new Set(Object.keys(DOMAINS ?? {}));
 
       if (!topicKeys.size) fail("TOPICS boş.");
@@ -229,7 +255,7 @@ if (js && errors.length === 0) {
         // Blueprint alanı: filtre ve rozet buna bağlı, eksikse sayfa patlar.
         if (!DOMAIN_KEYS.has(String(n.domain))) fail(`${at}: geçersiz domain '${n.domain}'. 1-5 olmalı.`);
         for (const t of n.tasks ?? []) {
-          if (!/^[1-5]\.\d+$/.test(t)) fail(`${at}: geçersiz task statement '${t}'. Örn. '1.6'.`);
+          if (!TASK_IDS.has(t)) fail(`${at}: blueprint'te olmayan task statement '${t}'. Örn. '1.6'.`);
           if (t.split(".")[0] !== String(n.domain)) {
             fail(`${at}: task '${t}' domain ${n.domain} ile uyuşmuyor.`);
           }
@@ -266,7 +292,7 @@ if (js && errors.length === 0) {
         const tasks = u.tasks ?? [];
         if (!tasks.length) fail(`${at}: en az bir task statement gerekli.`);
         for (const t of tasks) {
-          if (!/^[1-5]\.\d+$/.test(t)) fail(`${at}: geçersiz task statement '${t}'. Örn. '2.3'.`);
+          if (!TASK_IDS.has(t)) fail(`${at}: blueprint'te olmayan task statement '${t}'. Örn. '2.3'.`);
         }
         if (tasks.length && !tasks.some(t => t.split(".")[0] === String(u.domain))) {
           fail(`${at}: hiçbir task domain ${u.domain} ile uyuşmuyor.`);
@@ -357,8 +383,45 @@ if (js && errors.length === 0) {
             }
           }
 
+          /* Task dağılımı #/tasks ekranını kilitliyken besliyor. Toplamı `n`'e
+             EŞİT olmak zorunda değil — etiketsiz soru sayılmaz — ama aşamaz. */
+          if (blob.tasks === undefined) {
+            warn("Banka blob'unda `tasks` yok. build-bank.mjs eski sürümle çalıştırılmış; #/tasks kilitliyken sayı gösteremez.");
+          } else {
+            let tsum = 0;
+            for (const [k, v] of Object.entries(blob.tasks || {})) {
+              if (!TASK_IDS.has(k)) fail(`Banka bilinmeyen task anahtarı taşıyor: '${k}'.`);
+              if (!Number.isInteger(v) || v < 1) fail(`Banka task '${k}' sayısı geçersiz: '${v}'.`);
+              else tsum += v;
+            }
+            if (tsum > blob.n) fail(`Banka task toplamı ${tsum}, soru sayısı ${blob.n} — aşamaz.`);
+            console.log(`  task etiketi: ${tsum}/${blob.n} soru · ${Object.keys(blob.tasks).length}/${TASK_IDS.size} alt başlıkta soru var`);
+          }
+
           console.log(`  banka: ${blob.n} soru · ${(Buffer.from(blob.d, "base64").length / 1024).toFixed(1)} KB şifreli · ` +
             `${Object.entries(blob.topics).map(([k, v]) => `${k}=${v}`).join(" ")}`);
+        }
+      }
+    }
+  }
+
+  /* Elle task etiketi dosyası. Şekli burada denetlenir çünkü CI'da banka
+     çözülmüş hâlde yok; id'nin bankada karşılığı olup olmadığını build-bank.mjs
+     bakar (orada banka elinde). Bkz. SCHEMA.md. */
+  if (existsSync(SUBDOMAINS)) {
+    let cfg = null;
+    try { cfg = JSON.parse(readFileSync(SUBDOMAINS, "utf8")); }
+    catch (e) { fail(`${SUBDOMAINS} JSON değil: ${e.message}`); }
+    if (cfg !== null) {
+      if (typeof cfg !== "object" || Array.isArray(cfg)) {
+        fail(`${SUBDOMAINS}: { "<id>": { task, why } } nesnesi olmalı.`);
+      } else {
+        for (const [id, ent] of Object.entries(cfg)) {
+          const at = `${SUBDOMAINS}[${id}]`;
+          if (!ent || typeof ent !== "object" || Array.isArray(ent)) { fail(`${at}: { task, why } bekleniyor.`); continue; }
+          if (!TASK_IDS.has(ent.task)) fail(`${at}: blueprint'te olmayan task '${ent.task}'.`);
+          /* `why` zorunlu: elle etiket bir çıkarımdır, gerekçesiz yazılamaz. */
+          if (!String(ent.why || "").trim()) fail(`${at}: 'why' boş.`);
         }
       }
     }
