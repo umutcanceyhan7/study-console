@@ -86,8 +86,8 @@ corrected rather than a mismatched task bolted on.
 
 ## Question bank (`#/bank`)
 
-646 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
-+ BONUS Set 2, exams 1/2/3/5/6), 276 from CertSafari across eleven attempts (exams 7 and 9–18), and 60
+775 questions from three sources: 310 from the first Udemy course (Practice Exams 1–3 + BONUS Set 1
++ BONUS Set 2, exams 1/2/3/5/6), 405 from CertSafari across twenty attempts (exams 7 and 9–27), and 60
 from a second Udemy course ("Claude Certified Architect Foundations - 6 Practice Exams", Practice
 Test 1, exam 8).
 Separate from `M_BUILTIN` in every way — do not merge them.
@@ -102,10 +102,14 @@ time against `scripts/tasks.mjs` — the 30 task statements, titles taken verbat
 (`task: "2.4"`) into the record and **drops the long string**: the title's single owner is the
 `TASKS` table in `index.html`, whose copy `validate.mjs` asserts against `scripts/tasks.mjs`.
 
-`#/tasks` (Alt konu sınavı) draws only from tagged records — **276 of 646 today, all CertSafari**;
+`#/tasks` (Alt konu sınavı) draws only from tagged records — **405 of 775 today, all CertSafari**;
 Udemy questions carry no subdomain and are invisible there. A question leaves that pool permanently
 once answered **correctly** (`BSTORE.taskSolved`, localStorage, exportable from the screen); a wrong
-answer keeps it in rotation. Untagged questions are tagged by hand through
+answer keeps it in rotation. The **Kapsam** switch (`taskSetup.scope`, `"left"` default / `"all"`)
+overrides that for one run — "give me every question in this subtopic" — by loosening the read side
+only: `taskSolved` is not cleared and `bankPick` keeps recording correct answers in both scopes, so
+an "all" run never undoes progress. Clearing the record is a separate, confirmed action
+("Seçilenleri sıfırla"). Untagged questions are tagged by hand through
 `scripts/bank-subdomains.json` (`{ id: { task, why } }`, committed, `why` mandatory because a hand
 tag is an inference) — data, not code: add a line, rebuild, the question appears. The blob's meta
 carries a `tasks` histogram so the picker shows real counts while the bank is still locked.
@@ -157,6 +161,36 @@ Counts: E9 9 · E10 9 · E11 27 · E12 27 · E13 27.
 18 = `RO8Ojd9pDbZc6B6` (20q, 20/20). 130 attempt rows → **117 fresh** after 24 dedup skips; none of
 the new records is `stale`. Counts: E14 54 · E15 18 · E16 9 · E17 18 · E18 18. Domains across all
 CertSafari records: ctx 87 · tool 54 · agent 48 · cc 45 · pe 42.
+
+**CertSafari attempts 12–20 (`exam: 19`–`27`).** Nine more, added 2026-09-04, same chronological
+rule. One (`WUSvROqpnrxecT2`, 20/20) was an already-solved attempt that had never been ingested;
+the other eight were opened for the sweep and **left unanswered on purpose**. 180 attempt rows →
+**129 fresh** after 51 dedup skips; none of the new records is `stale`, and none carries a note or a
+`miss` (nothing was answered). Counts: E19 18 · E20 10 · E21 18 · E22 18 · E23 18 · E24 18 ·
+E25 12 · E26 9 · E27 8. Domains across all CertSafari records: pe 95 · cc 93 · ctx 87 · tool 82 ·
+agent 48.
+
+**The pool is 480 questions and the site says so.** The certificate record carries
+`question_count: 480` and `domain_question_counts` (D1 112 · D2 80 · D3 96 · D4 96 · D5 96) in
+`_next/static/chunks/4131-*.js`. Each domain divides evenly by its subdomain count, so the **live
+pool holds 16 questions per task statement** — corroborated by the sweep: 2.4 stopped dead at 16 and
+further D2 draws returned only duplicates. **A bank count above 16 is not a bug**: retired questions
+(`stale: 1`) are kept by design and their successors are ingested too, both counted under the same
+task. "Is this subtopic finished" is answered by the non-`stale` count, not the raw one.
+Live coverage today: D1 46/112 · D2 82/80 · D3 90/96 · D4 94/96 · D5 86/96 — **398 of 480**.
+
+**Three things about sweeping the pool, all learned 2026-09-04 and written up in `INGEST.md`.**
+(1) `create-quiz` sits behind Cloudflare Turnstile (a Supabase edge function taking
+`cf_turnstile_token`; the server returns `TURNSTILE_FAILED`), so **Claude does not create attempts**
+— the user opens the quiz in the browser and everything after that needs no identity at all.
+(2) A quiz **binds all its questions at creation**: on a fresh `ongoing` attempt with zero answers,
+`quiz-nth-question` returns every index 1..n. Nobody has to click through the quiz to scrape it.
+(3) Domain mode (`mode: "domain"`) narrows the draw to one domain, which is how a specific subtopic
+gets filled; the UI caps domain quizzes at **20 questions** (exam mode goes to 60), and there is no
+subdomain-level mode.
+
+Target subtopics for the 2.4/3.6/4.5 study set: **2.4 16/16 ✓ · 3.6 16/16 ✓ · 4.5 15/16** (one
+question still unseen; only 2 of D4's 96 remain undrawn).
 
 The `get-quizzes` endpoint lists every attempt for a `user_id`, so "which of these is new" is a
 set difference against `data/certsafari/attempts.json`, not a guess. The only thing that has to come

@@ -176,6 +176,71 @@ node scripts/validate.mjs
 ve `notes-merged.json` (not bağlanan her soru). Bir not bankada karşılık bulamazsa
 betik **durur** — sessizce düşmez.
 
+
+### Havuzun tamamını süpürmek (2026-09-04'te öğrenildi)
+
+11. **Havuz 480 soru, ve domain başına sayılar sitenin kendi yapılandırmasında
+    yazıyor.** Sertifika kaydı `question_count: 480` ve `domain_question_counts`
+    taşıyor: D1 112 · D2 80 · D3 96 · D4 96 · D5 96. Değer
+    `_next/static/chunks/4131-*.js` içinde düz JSON olarak duruyor, tahmin
+    gerekmiyor:
+
+    ```bash
+    curl -s -H "User-Agent: $UA" https://www.certsafari.com/anthropic/claude-certified-architect-foundations \
+      | grep -oE '/_next/static/chunks/[a-zA-Z0-9/_.-]+\.js' | sort -u   # sonra chunk'larda "question_count" ara
+    ```
+
+    Her domain kendi alt başlık sayısına tam bölünüyor (112/7, 80/5, 96/6, 96/6,
+    96/6) — yani **canlı havuzda task statement başına 16 soru**. Çıkarım
+    doğrulandı: D2 süpürüldükten sonra 2.4 tam 16'da durdu, sonraki çekişler
+    yalnızca tekrar getirdi.
+
+    **Bankadaki sayı 16'yı aşabilir ve bu bir hata değil.** Emekli sorular
+    (`stale: 1`) elenmiyor (§9), halefleri de bankaya giriyor, ikisi de aynı
+    task altında sayılıyor. "Bu alt başlık bitti mi" sorusunun cevabı bankadaki
+    ham sayı değil, **`stale` olmayan kayıt sayısı**.
+
+12. **Sınav oluşturma Cloudflare Turnstile arkasında — Claude oluşturamaz.**
+    `create-quiz` bir Supabase edge function
+    (`https://tjiccjchmnltoqktzbec.supabase.co/functions/v1/create-quiz`),
+    gövdesi `{certificate, vendor, n_questions, user_id, mode, study_mode,
+    domain, exam_domain_mix, cf_turnstile_token, request_id}` ve sunucu
+    `TURNSTILE_FAILED` döndürüyor. Bot tespitini aşmak kural dışı; **sınavı
+    kullanıcı tarayıcıda açar**. Sonrasındaki kazımanın kimliğe ihtiyacı yok
+    (§1), yani iş bölümü net: bir tıklama kullanıcının, gerisi betiğin.
+
+13. **Sınav sorularını en baştan bağlıyor — cevaplamaya gerek yok.** Bu turun en
+    çok iş tasarruf eden bulgusu. Yeni açılmış, `status: "ongoing"`, hiç
+    cevaplanmamış bir sınavda `quiz-nth-question` 1..n arasındaki **her** indeksi
+    döndürüyor. Yani kullanıcı sınavı açıp bırakır, 20 sorunun 20'si de çekilir.
+    (Eski kanıt aynı yöne işaret ediyordu: exam 12'nin attempt dosyasında 29
+    cevap satırı varken `q12/` içinde 30 soru dosyası var.)
+
+    Prob ayrı araç istemiyor, `scrape.sh` zaten aralık dışında duruyor:
+
+    ```bash
+    bash data/certsafari/scrape.sh <quizId> /tmp/probe 5
+    ```
+
+14. **Süpürme yolu domain modu.** `mode: "domain"` + `domain: "Domain 3: …"` ile
+    açılan sınav yalnızca o domainden soru veriyor, dolayısıyla hedef alt başlık
+    1/30 yerine 1/5 ya da 1/6 sıklıkla geliyor. Alt başlık düzeyinde sınav modu
+    **yok** — arandı, `subdomain` yalnızca study-note dışa aktarımında geçiyor.
+
+    Arayüz domain modunda **en fazla 20 soru** veriyor (exam modunda 60 çıkıyor).
+    Yani bir domain birkaç 20'lik sınavla süpürülür. Gözlenen tazelik yüksek:
+    2026-09-04'te açılan altı 20'lik sınavın dördü 18/20, ikisi 18/20 ve 10/20
+    yeni getirdi — havuz sıralaması FSRS'e göre görülmemişi öne alıyor, ama
+    garanti değil, domain tükendikçe tekrar oranı yükseliyor.
+
+15. **`scrape.sh`'nin varsayılan `maxIndex`'i 90.** 96'lık bir çekişte üçüncü
+    argümanı açıkça vermek gerekir; yoksa sessizce 90'da kesilir.
+
+16. **Rate limit iki uca birden bakıyor.** Arka arkaya birkaç sınav kazıdıktan
+    sonra `get-quiz` de `RATE_LIMIT` döndürüyor. `fetch-attempt.sh`'yi
+    `scrape.sh`'lerden **önce** çalıştır (§ sıra notu) ya da aralarında ~70 sn
+    bekle.
+
 Diğer uçlar: `/api/questions`, `/api/quiz-question-lifecycle`,
 `/api/update-quiz-progress`, `/api/saved-questions`. Site Next.js; uç nokta
 gövdeleri `_next/static/chunks/app/[vendor]/quiz/[id]/page-*.js` içinde okunabilir
